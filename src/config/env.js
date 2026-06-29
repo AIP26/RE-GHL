@@ -47,6 +47,7 @@ export const env = {
     clientSecret: process.env.GHL_CLIENT_SECRET,
     redirectUri: process.env.GHL_REDIRECT_URI,
     scopes: process.env.GHL_SCOPES,
+    userType: process.env.GHL_USER_TYPE || 'Location',
   },
   encryption: {
     key: process.env.ENCRYPTION_KEY,

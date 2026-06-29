@@ -8,6 +8,7 @@ import morgan from 'morgan';
 
 import { env } from './config/env.js';
 import { buildApiRouter } from './routes/index.js';
+import oauthRoutes from './routes/oauth.js';
 import publicRoutes from './routes/public.js';
 import { resolveTenantByHost } from './middleware/tenant.js';
 import { startJobs } from './jobs/index.js';
@@ -32,6 +33,10 @@ app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
 // API privada / admin (siempre bajo /api)
 app.use('/api', buildApiRouter());
+
+// OAuth GHL — montado en /auth (no /api/auth) porque el redirect URI
+// registrado en GHL es https://panel.mktscaled.com/auth/callback
+app.use('/auth', oauthRoutes);
 
 // Páginas públicas multi-tenant: se montan en la raíz, resolviendo el tenant
 // por header Host. Se ejecutan después de /api para que las rutas /api/* no

@@ -35,6 +35,16 @@ pública profesional en su dominio."*
 
 ## Estado de implementación
 
+### 2026-02 — Sesión 2 — Paso 2: OAuth GHL + AES-256 + cron refresh 23h
+- ✅ `src/lib/ghl.js`: `getAuthorizeUrl`, `exchangeCodeForToken`, `refreshAccessToken` con endpoints reales de GHL (marketplace.gohighlevel.com/oauth/chooselocation + services.leadconnectorhq.com/oauth/token).
+- ✅ `src/lib/tenants.js`: `upsertTenantFromOAuth` (idempotente por `ghl_location_id`), `listActiveTenants`, `getTenantWithTokens` (descifra al leer), `updateTenantTokens`, `markNeedsReauth`. Todo cifra/descifra con AES-256-GCM al pasar por la capa de DB.
+- ✅ `src/routes/oauth.js` montado en `/auth` (no `/api/auth`) — coincide con el Redirect URI `https://panel.mktscaled.com/auth/callback` configurado en GHL. Endpoints: `GET /auth` (302 a GHL con state) y `GET /auth/callback` (intercambia + persiste + pantalla HTML de éxito/error).
+- ✅ `src/jobs/refresh-tokens.js`: refresca todos los tenants activos, cifra los nuevos tokens, marca `needs_reauth` si refresh falla.
+- ✅ `src/jobs/index.js`: cron `0 */23 * * *` para refresh + stub cron `*/1 * * * *` para CNAME (Paso 10).
+- ✅ Integración Supabase verificada end-to-end con `scripts/integration-step-2.js`: upsert OK, tokens cifrados en reposo, roundtrip decrypt OK, idempotencia OK, cleanup OK.
+- ✅ Servidor probado: `GET /auth` → 302 a `marketplace.gohighlevel.com/oauth/chooselocation?...redirect_uri=https%3A%2F%2Fpanel.mktscaled.com%2Fauth%2Fcallback&...`.
+- ✅ `.env` creado con credenciales reales del usuario + claves AES-256 y JWT generadas.
+
 ### 2026-02 — Sesión 1 — Paso 1 + estructura base
 - ✅ Stack reemplazado: FastAPI + Mongo → Node.js + Express + Supabase.
 - ✅ `sql/schema.sql` con las 8 tablas, constraints, índices y RLS.
@@ -49,7 +59,7 @@ pública profesional en su dominio."*
 ## Backlog priorizado
 
 ### P0 — Próximos pasos para tener app funcional
-- [ ] **Paso 2** — OAuth GHL completo (`/api/auth`, `/api/auth/callback`) + cifrado tokens + node-cron refresh 23h.
+- [x] **Paso 2** — OAuth GHL completo (`/auth`, `/auth/callback`) + cifrado tokens + node-cron refresh 23h.
 - [ ] **Paso 3** — Webhook instalar/desinstalar + creación automática primer admin + `/api/auth/sso` (locationId+userId → JWT).
 - [ ] **Paso 4** — Crear Custom Object "Propiedad" via API GHL + guardar `ghl-field-ids.json`.
 
