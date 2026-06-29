@@ -15,14 +15,21 @@ export const GHL_API_VERSION = '2021-07-28';
 // Si necesitas cambiar scopes, edítalos aquí y republica en el Marketplace.
 // ---------------------------------------------------------------------
 export const GHL_SCOPES = [
-  'contacts.readonly',
-  'contacts.write',
   'locations.readonly',
-  'oauth.readonly',
-  'oauth.write',
-  'custom-objects.readonly',
-  'custom-objects.write',
+  'contacts.write',
+  'associations.write',
+  'associations.readonly',
+  'associations/relation.readonly',
+  'associations/relation.write',
+  'businesses.readonly',
+  'businesses.write',
+  'locations/customFields.readonly',
+  'locations/customFields.write',
   'users.readonly',
+  'objects/schema.write',
+  'objects/record.readonly',
+  'objects/record.write',
+  'objects/schema.readonly',
 ].join(' ');
 
 // ---------------------------------------------------------------------
