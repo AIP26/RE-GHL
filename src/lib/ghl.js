@@ -42,7 +42,7 @@ export async function exchangeCodeForToken(code) {
     },
     timeout: 30_000,
   });
-  return data; // { access_token, refresh_token, expires_in, scope, userType, locationId, companyId, userId, ... }
+  return data;
 }
 
 // ---------------------------------------------------------------------
@@ -68,7 +68,7 @@ export async function refreshAccessToken(refreshToken) {
 }
 
 // ---------------------------------------------------------------------
-// Cliente autenticado (para llamadas a la API después del OAuth)
+// Cliente autenticado para la API v2
 // ---------------------------------------------------------------------
 export function ghlClient(accessToken) {
   return axios.create({
@@ -80,4 +80,13 @@ export function ghlClient(accessToken) {
     },
     timeout: 30_000,
   });
+}
+
+// ---------------------------------------------------------------------
+// Users API — obtiene datos del usuario (lo usamos para el instalador)
+// ---------------------------------------------------------------------
+export async function getUserById(accessToken, userId) {
+  const { data } = await ghlClient(accessToken).get(`/users/${userId}`);
+  // GHL devuelve {user: {...}} o {...} según el endpoint. Normalizamos.
+  return data?.user || data;
 }

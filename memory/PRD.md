@@ -35,6 +35,25 @@ pública profesional en su dominio."*
 
 ## Estado de implementación
 
+### 2026-02 — Sesión 3 — Paso 3: Webhook + SSO + middleware
+- ✅ `src/lib/agentes.js`: `findAgentByGhlUser`, `upsertAgent` (idempotente por UNIQUE(tenant_id, ghl_user_id)), `ensureFirstAdmin`.
+- ✅ `src/lib/tenants.js`: agregado `findTenantByLocationId`, `markInactive`.
+- ✅ `src/lib/ghl.js`: agregado `getUserById` (GHL Users API).
+- ✅ `src/lib/webhook-verify.js`: verificación Ed25519 de `X-GHL-Signature` (estándar nuevo de GHL). Soporta PEM SPKI o base64 raw de 32 bytes. Si no hay clave configurada, registra WARN y acepta (dev).
+- ✅ `src/routes/webhook.js` montado en `/api/webhook` (la URL real configurada en GHL: `https://listings.mktscaled.com/api/webhook`). Maneja `LocationCreate`/`INSTALL` y `LocationDelete`/`UNINSTALL`. Idempotente. Devuelve 200 incluso en errores internos para evitar reintentos infinitos de GHL.
+- ✅ `src/routes/auth.js`:
+    - `GET /api/auth/sso?locationId=&userId=` → 200 con `{token, agente, tenant}` (JWT 23h). 404 si tenant no existe, 403 si inactive, 409 si needs_reauth.
+    - `GET /api/auth/me` (protegido) → contexto del agente actual.
+- ✅ `src/middleware/auth.js`: `requireSession` verifica JWT + carga tenant + agente desde DB y los adjunta a `req.tenant`, `req.agente`. Plus `requireAdmin` para endpoints admin-only.
+- ✅ `src/server.js`: raw body capture en `express.json({verify})` para validar firma del webhook sobre bytes originales.
+- ✅ Integration test `scripts/integration-step-3.js` pasa end-to-end:
+    - webhook LocationCreate crea admin con datos del payload (cuando GHL Users API falla por token inválido, fallback al payload — verificado).
+    - SSO admin firma JWT con `rol=admin` y exp=23h.
+    - SSO con userId nuevo crea agente automáticamente con rol=agente.
+    - `/me` sin token → 401; con token inválido → 401; con token válido → devuelve agente + tenant.
+    - webhook LocationDelete marca tenant `inactive` (NO borra datos).
+    - SSO post-uninstall → 403 `tenant_inactive`.
+
 ### 2026-02 — Sesión 2 — Paso 2: OAuth GHL + AES-256 + cron refresh 23h
 - ✅ `src/lib/ghl.js`: `getAuthorizeUrl`, `exchangeCodeForToken`, `refreshAccessToken` con endpoints reales de GHL (marketplace.gohighlevel.com/oauth/chooselocation + services.leadconnectorhq.com/oauth/token).
 - ✅ `src/lib/tenants.js`: `upsertTenantFromOAuth` (idempotente por `ghl_location_id`), `listActiveTenants`, `getTenantWithTokens` (descifra al leer), `updateTenantTokens`, `markNeedsReauth`. Todo cifra/descifra con AES-256-GCM al pasar por la capa de DB.
@@ -60,7 +79,7 @@ pública profesional en su dominio."*
 
 ### P0 — Próximos pasos para tener app funcional
 - [x] **Paso 2** — OAuth GHL completo (`/auth`, `/auth/callback`) + cifrado tokens + node-cron refresh 23h.
-- [ ] **Paso 3** — Webhook instalar/desinstalar + creación automática primer admin + `/api/auth/sso` (locationId+userId → JWT).
+- [x] **Paso 3** — Webhook instalar/desinstalar + creación automática primer admin + `/api/auth/sso` (locationId+userId → JWT) + `requireSession` middleware.
 - [ ] **Paso 4** — Crear Custom Object "Propiedad" via API GHL + guardar `ghl-field-ids.json`.
 
 ### P1 — Producto mínimo vendible

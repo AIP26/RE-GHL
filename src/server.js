@@ -27,7 +27,16 @@ app.use(
 );
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(
+  express.json({
+    limit: '2mb',
+    // Capturamos el raw body para que el handler del webhook pueda verificar
+    // la firma Ed25519 (X-GHL-Signature) sobre los bytes originales.
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 

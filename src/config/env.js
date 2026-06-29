@@ -48,6 +48,7 @@ export const env = {
     redirectUri: process.env.GHL_REDIRECT_URI,
     scopes: process.env.GHL_SCOPES,
     userType: process.env.GHL_USER_TYPE || 'Location',
+    webhookPublicKey: process.env.GHL_WEBHOOK_PUBLIC_KEY,
   },
   encryption: {
     key: process.env.ENCRYPTION_KEY,

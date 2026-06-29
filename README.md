@@ -106,7 +106,7 @@ yarn dev
 |---|------|--------|
 | 1 | Schema Supabase (8 tablas) | ✅ |
 | 2 | OAuth GHL + refresh tokens 23h | ✅ |
-| 3 | Webhook instalar/desinstalar + primer agente admin + SSO iframe | ⏳ |
+| 3 | Webhook instalar/desinstalar + primer agente admin + SSO iframe | ✅ |
 | 4 | Custom Object "Propiedad" + `ghl-field-ids.json` | ⏳ |
 | 5 | Menú lateral React (formulario completo) | ⏳ |
 | 6 | Upload fotos → Cloudinary | ⏳ |
