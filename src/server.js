@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
 import morgan from 'morgan';
+import path from 'node:path';
 
 import { env } from './config/env.js';
 import { buildApiRouter } from './routes/index.js';
@@ -12,6 +13,17 @@ import oauthRoutes from './routes/oauth.js';
 import publicRoutes from './routes/public.js';
 import { resolveTenantByHost } from './middleware/tenant.js';
 import { startJobs } from './jobs/index.js';
+
+// Captura defensiva — si algún async escapa al error handler de Express,
+// log y seguir viviendo (mejor que crashear el proceso completo en Railway).
+process.on('unhandledRejection', (reason) => {
+  // eslint-disable-next-line no-console
+  console.error('[unhandledRejection]', reason?.response?.data || reason);
+});
+process.on('uncaughtException', (err) => {
+  // eslint-disable-next-line no-console
+  console.error('[uncaughtException]', err);
+});
 
 const app = express();
 
@@ -46,6 +58,12 @@ app.use('/api', buildApiRouter());
 // OAuth GHL — montado en /auth (no /api/auth) porque el redirect URI
 // registrado en GHL es https://panel.mktscaled.com/auth/callback
 app.use('/auth', oauthRoutes);
+
+// Panel del menú lateral GHL (iframe). Sirve /public/panel/ como SPA.
+// El index.html se sirve para cualquier ruta dentro de /panel para que el
+// hash-routing del SPA funcione tras refresh.
+const panelDir = path.resolve(process.cwd(), 'public/panel');
+app.use('/panel', express.static(panelDir, { index: 'index.html', extensions: ['html'] }));
 
 // Páginas públicas multi-tenant: se montan en la raíz, resolviendo el tenant
 // por header Host. Se ejecutan después de /api para que las rutas /api/* no

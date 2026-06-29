@@ -188,3 +188,49 @@ export async function createCustomField(accessToken, payload) {
   const { data } = await ghlClient(accessToken).post('/custom-fields/', payload);
   return data?.field || data?.customField || data;
 }
+
+// ---------------------------------------------------------------------
+// Custom Object Records (instancias del schema "propiedad")
+// ---------------------------------------------------------------------
+
+/** POST /objects/{schemaKey}/records — crea un record. */
+export async function createObjectRecord(accessToken, fullObjectKey, payload) {
+  const { data } = await ghlClient(accessToken).post(
+    `/objects/${encodeURIComponent(fullObjectKey)}/records`,
+    payload
+  );
+  return data?.record || data;
+}
+
+/** GET /objects/{schemaKey}/records/{id} */
+export async function getObjectRecord(accessToken, fullObjectKey, recordId, locationId) {
+  const { data } = await ghlClient(accessToken).get(
+    `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`,
+    { params: { locationId } }
+  );
+  return data?.record || data;
+}
+
+/** PUT /objects/{schemaKey}/records/{id} */
+export async function updateObjectRecord(accessToken, fullObjectKey, recordId, payload) {
+  const { data } = await ghlClient(accessToken).put(
+    `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`,
+    payload
+  );
+  return data?.record || data;
+}
+
+/** Búsqueda + paginación de records. */
+export async function listObjectRecords(accessToken, fullObjectKey, { locationId, limit = 20, offset = 0, query }) {
+  const body = {
+    locationId,
+    page: Math.floor(offset / limit) + 1,
+    pageLimit: limit,
+    query: query || '',
+  };
+  const { data } = await ghlClient(accessToken).post(
+    `/objects/${encodeURIComponent(fullObjectKey)}/records/search`,
+    body
+  );
+  return data;
+}

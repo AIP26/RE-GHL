@@ -108,7 +108,7 @@ yarn dev
 | 2 | OAuth GHL + refresh tokens 23h | ✅ |
 | 3 | Webhook instalar/desinstalar + primer agente admin + SSO iframe | ✅ |
 | 4 | Custom Object "Propiedad" + `ghl-field-ids.json` | ✅ |
-| 5 | Menú lateral React (formulario completo) | ⏳ |
+| 5 | Menú lateral React (formulario completo) | ✅ |
 | 6 | Upload fotos → Cloudinary | ⏳ |
 | 7 | CRUD Colecciones | ⏳ |
 | 8 | Gestión de agentes + límites por plan | ⏳ |

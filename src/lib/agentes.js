@@ -38,26 +38,7 @@ export async function upsertAgent({
 }) {
   const sb = getSupabase();
 
-  const existing = await findAgentByGhlUser(tenantId, ghlUserId);
-  if (existing) {
-    const update = {};
-    if (nombre != null) update.nombre = nombre;
-    if (email != null) update.email = email;
-    if (telefono != null) update.telefono = telefono;
-    if (whatsapp != null) update.whatsapp = whatsapp;
-    if (foto_url != null) update.foto_url = foto_url;
-    if (rol != null) update.rol = rol;
-    if (Object.keys(update).length === 0) return existing;
-    const { data, error } = await sb
-      .from(TABLE)
-      .update(update)
-      .eq('id', existing.id)
-      .select(SELECT_PUBLIC)
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
+  // Atómico vía PostgreSQL ON CONFLICT — evita race conditions de SSO concurrente.
   const insert = {
     tenant_id: tenantId,
     ghl_user_id: ghlUserId,
@@ -69,7 +50,33 @@ export async function upsertAgent({
     rol: rol || 'agente',
     activo: true,
   };
-  const { data, error } = await sb.from(TABLE).insert(insert).select(SELECT_PUBLIC).single();
+  const { data: inserted, error: insErr } = await sb
+    .from(TABLE)
+    .insert(insert)
+    .select(SELECT_PUBLIC)
+    .single();
+
+  if (!insErr) return inserted;
+  // 23505 = unique_violation -> ya existe, lo leemos y aplicamos updates parciales.
+  if (insErr.code !== '23505') throw insErr;
+
+  const existing = await findAgentByGhlUser(tenantId, ghlUserId);
+  if (!existing) throw insErr; // raro: violation pero no encontramos la fila
+  const update = {};
+  if (nombre != null && !existing.nombre) update.nombre = nombre;
+  if (email != null) update.email = email;
+  if (telefono != null) update.telefono = telefono;
+  if (whatsapp != null) update.whatsapp = whatsapp;
+  if (foto_url != null) update.foto_url = foto_url;
+  // Solo subimos de rol (agente -> admin), nunca degradamos.
+  if (rol === 'admin' && existing.rol !== 'admin') update.rol = 'admin';
+  if (Object.keys(update).length === 0) return existing;
+  const { data, error } = await sb
+    .from(TABLE)
+    .update(update)
+    .eq('id', existing.id)
+    .select(SELECT_PUBLIC)
+    .single();
   if (error) throw error;
   return data;
 }

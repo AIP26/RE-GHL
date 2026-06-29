@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>mktscaled — Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://api.cloudinary.com" crossorigin />
+  <link rel="preconnect" href="https://maps.googleapis.com" crossorigin />
+  <link rel="stylesheet" href="/panel/style.css" />
+</head>
+<body>
+  <div id="root">
+    <div class="boot">
+      <div class="boot-spinner"></div>
+      <div class="boot-text">Cargando panel…</div>
+    </div>
+  </div>
+
+  <!-- React 18 UMD + htm para JSX sin build step -->
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/htm@3.1.1/dist/htm.js"></script>
+  <script src="/panel/app.js?v=3"></script>
+</body>
+</html>

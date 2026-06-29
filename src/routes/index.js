@@ -1,6 +1,4 @@
 // Registrador central de rutas. Cada ruta se monta bajo /api/<recurso>.
-// Los stubs viven para que la estructura quede lista y los siguientes pasos
-// solo tengan que implementar handlers.
 import { Router } from 'express';
 
 import health from './health.js';
@@ -14,6 +12,8 @@ import share from './share.js';
 import agent from './agent.js';
 import analytics from './analytics.js';
 import domain from './domain.js';
+import { requireSession } from '../middleware/auth.js';
+import { env } from '../config/env.js';
 
 export function buildApiRouter() {
   const r = Router();
@@ -28,5 +28,15 @@ export function buildApiRouter() {
   r.use('/agent', agent);
   r.use('/analytics', analytics);
   r.use('/domain', domain);
+
+  // GET /api/runtime-config — config pública que necesita el SPA del menú
+  // lateral (Google Maps key, Cloudinary cloud name). Requiere sesión.
+  r.get('/runtime-config', requireSession, (_req, res) => {
+    res.json({
+      googleMapsApiKey: env.googleMaps.apiKey || null,
+      cloudinaryCloudName: env.cloudinary.cloudName || null,
+    });
+  });
+
   return r;
 }
