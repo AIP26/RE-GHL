@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build / cache
+dist/
+build/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.eslintcache
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Generado en Paso 4 (Custom Object GHL) — se commitea opcionalmente
+# Si decides versionarlo, comenta la línea siguiente.
+# ghl-field-ids.json
+
+# Misc
+.emergent/
+test_reports/
