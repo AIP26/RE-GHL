@@ -52,3 +52,9 @@ coverage/
 # Misc
 .emergent/
 test_reports/
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
