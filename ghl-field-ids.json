@@ -1,0 +1,304 @@
+{
+  "objectKey": "custom_objects.propiedad",
+  "schemaId": "6a42fb7cf7d1f202460ad890",
+  "folderId": "AG5F4RBZsGpMDnvb5xek",
+  "folderName": "Propiedad Info",
+  "locationId": "cNg6MFQcxv8bZnwCppoM",
+  "generatedAt": "2026-06-29T23:15:11.806Z",
+  "summary": {
+    "defined": 48,
+    "created": 47,
+    "skipped": 1,
+    "failed": 0
+  },
+  "fields": {
+    "descripcion": {
+      "id": "2kDuyr7Ej4WQ4heQTGN8",
+      "fieldKey": "custom_objects.propiedad.descripcion",
+      "name": "Descripción",
+      "dataType": "LARGE_TEXT"
+    },
+    "tipo_operacion": {
+      "id": "4J3wuaAiY4cSCsfXTc87",
+      "fieldKey": "custom_objects.propiedad.tipo_operacion",
+      "name": "Tipo de operación",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "tipo_inmueble": {
+      "id": "YhswNukXx8Wlhv4q7egr",
+      "fieldKey": "custom_objects.propiedad.tipo_inmueble",
+      "name": "Tipo de inmueble",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "estado": {
+      "id": "Syu3yxvaaFSvBr8U0RRz",
+      "fieldKey": "custom_objects.propiedad.estado",
+      "name": "Estado de la propiedad",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "etiqueta": {
+      "id": "ZrcCHmueDTTA6Bw7rVeC",
+      "fieldKey": "custom_objects.propiedad.etiqueta",
+      "name": "Etiqueta",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "preventa": {
+      "id": "wdbSKGyrw8ZFhn4bWlj1",
+      "fieldKey": "custom_objects.propiedad.preventa",
+      "name": "Preventa",
+      "dataType": "CHECKBOX"
+    },
+    "fecha_entrega": {
+      "id": "pqjQ1KUWiFyB9yvraa6x",
+      "fieldKey": "custom_objects.propiedad.fecha_entrega",
+      "name": "Fecha estimada de entrega",
+      "dataType": "DATE"
+    },
+    "agente_responsable": {
+      "id": "De3nxK8dFqMKsYjf53y0",
+      "fieldKey": "custom_objects.propiedad.agente_responsable",
+      "name": "Agente responsable",
+      "dataType": "TEXT"
+    },
+    "cta_tipo": {
+      "id": "MGxTdGO7cHvfDFxdWCmZ",
+      "fieldKey": "custom_objects.propiedad.cta_tipo",
+      "name": "CTA tipo",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "cta_valor": {
+      "id": "mc6MbCuHVgZyvyRHwR6Q",
+      "fieldKey": "custom_objects.propiedad.cta_valor",
+      "name": "CTA valor",
+      "dataType": "TEXT"
+    },
+    "precio_usd": {
+      "id": "cNEplGpvyzS0rexbthVo",
+      "fieldKey": "custom_objects.propiedad.precio_usd",
+      "name": "Precio USD",
+      "dataType": "NUMERICAL"
+    },
+    "precio_mxn": {
+      "id": "EP0HC46KdzcdbGS1sbrS",
+      "fieldKey": "custom_objects.propiedad.precio_mxn",
+      "name": "Precio MXN",
+      "dataType": "NUMERICAL"
+    },
+    "precio_a_consultar": {
+      "id": "T6dNfBmdQ602LMvzpJ1P",
+      "fieldKey": "custom_objects.propiedad.precio_a_consultar",
+      "name": "Precio a consultar",
+      "dataType": "CHECKBOX"
+    },
+    "nota_precio": {
+      "id": "zrWXrs7uPzNE7bIC3RNo",
+      "fieldKey": "custom_objects.propiedad.nota_precio",
+      "name": "Nota de precio",
+      "dataType": "TEXT"
+    },
+    "cuota_mantenimiento": {
+      "id": "dus0TD1gf3rXbF6RWdbV",
+      "fieldKey": "custom_objects.propiedad.cuota_mantenimiento",
+      "name": "Cuota de mantenimiento",
+      "dataType": "NUMERICAL"
+    },
+    "direccion_completa": {
+      "id": "1JjHFxD4GBcfxZO0eXbu",
+      "fieldKey": "custom_objects.propiedad.direccion_completa",
+      "name": "Dirección completa",
+      "dataType": "TEXT"
+    },
+    "colonia": {
+      "id": "Mufbbbk8yhWP0Qcnc53m",
+      "fieldKey": "custom_objects.propiedad.colonia",
+      "name": "Colonia o zona",
+      "dataType": "TEXT"
+    },
+    "ciudad": {
+      "id": "46pPPje4n6Qn5lhG9u9O",
+      "fieldKey": "custom_objects.propiedad.ciudad",
+      "name": "Ciudad",
+      "dataType": "TEXT"
+    },
+    "estado_municipio": {
+      "id": "Rc1AJvK4MoEwI3jYKGDo",
+      "fieldKey": "custom_objects.propiedad.estado_municipio",
+      "name": "Estado o municipio",
+      "dataType": "TEXT"
+    },
+    "codigo_postal": {
+      "id": "UEC7FHFjjTUFpJqPBQvb",
+      "fieldKey": "custom_objects.propiedad.codigo_postal",
+      "name": "Código postal",
+      "dataType": "TEXT"
+    },
+    "latitud": {
+      "id": "uhD9i8LHwAIplwOEFzBr",
+      "fieldKey": "custom_objects.propiedad.latitud",
+      "name": "Latitud",
+      "dataType": "NUMERICAL"
+    },
+    "longitud": {
+      "id": "mOOXB1UJqOJHf6Xv5OA9",
+      "fieldKey": "custom_objects.propiedad.longitud",
+      "name": "Longitud",
+      "dataType": "NUMERICAL"
+    },
+    "ocultar_direccion": {
+      "id": "ef26eK1bQfPxBAzfTTu5",
+      "fieldKey": "custom_objects.propiedad.ocultar_direccion",
+      "name": "Ocultar dirección exacta",
+      "dataType": "CHECKBOX"
+    },
+    "zona_federal": {
+      "id": "JOh0OOHd3AGlKlPPjm5R",
+      "fieldKey": "custom_objects.propiedad.zona_federal",
+      "name": "Zona Federal",
+      "dataType": "CHECKBOX"
+    },
+    "m2_construccion": {
+      "id": "Q4frXUWQKrNGTRpSz7gB",
+      "fieldKey": "custom_objects.propiedad.m2_construccion",
+      "name": "m2 construcción",
+      "dataType": "NUMERICAL"
+    },
+    "m2_terreno": {
+      "id": "gQ1nNT6JmbsQZRtMgmYz",
+      "fieldKey": "custom_objects.propiedad.m2_terreno",
+      "name": "m2 terreno",
+      "dataType": "NUMERICAL"
+    },
+    "nombre_condominio": {
+      "id": "fSSHPKQr4yoRytkhBQe3",
+      "fieldKey": "custom_objects.propiedad.nombre_condominio",
+      "name": "Nombre del condominio",
+      "dataType": "TEXT"
+    },
+    "niveles": {
+      "id": "Mdpx8WbZ9tv421KMfKME",
+      "fieldKey": "custom_objects.propiedad.niveles",
+      "name": "Niveles",
+      "dataType": "NUMERICAL"
+    },
+    "piso_edificio": {
+      "id": "2EDOFgDU3XOsuRZzQ1uu",
+      "fieldKey": "custom_objects.propiedad.piso_edificio",
+      "name": "Piso en edificio",
+      "dataType": "NUMERICAL"
+    },
+    "anio_construccion": {
+      "id": "IKCCOvcJF8oOR3cgtaef",
+      "fieldKey": "custom_objects.propiedad.anio_construccion",
+      "name": "Año de construcción",
+      "dataType": "NUMERICAL"
+    },
+    "recamaras": {
+      "id": "dH0XZKynV2DZmR5L3R2b",
+      "fieldKey": "custom_objects.propiedad.recamaras",
+      "name": "Recámaras",
+      "dataType": "NUMERICAL"
+    },
+    "banos_completos": {
+      "id": "7Xf509jmNBiFDutgq3MI",
+      "fieldKey": "custom_objects.propiedad.banos_completos",
+      "name": "Baños completos",
+      "dataType": "NUMERICAL"
+    },
+    "medios_banos": {
+      "id": "ahPdiPCzybpkWcc5JBAn",
+      "fieldKey": "custom_objects.propiedad.medios_banos",
+      "name": "Medios baños",
+      "dataType": "NUMERICAL"
+    },
+    "estacionamientos": {
+      "id": "LZdmdWjEHJM8ChRufRCY",
+      "fieldKey": "custom_objects.propiedad.estacionamientos",
+      "name": "Estacionamientos",
+      "dataType": "NUMERICAL"
+    },
+    "cuarto_servicio": {
+      "id": "Wb00em9J1DHBOdmX9zRt",
+      "fieldKey": "custom_objects.propiedad.cuarto_servicio",
+      "name": "Cuarto de servicio",
+      "dataType": "CHECKBOX"
+    },
+    "bodega_storage": {
+      "id": "JuWF1NNRKqvmBnnH6m7i",
+      "fieldKey": "custom_objects.propiedad.bodega_storage",
+      "name": "Bodega o storage",
+      "dataType": "CHECKBOX"
+    },
+    "amenidades": {
+      "id": "89J5pRDbv6ZorwDWETmb",
+      "fieldKey": "custom_objects.propiedad.amenidades",
+      "name": "Amenidades",
+      "dataType": "LARGE_TEXT"
+    },
+    "vista_principal": {
+      "id": "WtUNZPMe66WeG1zq9zHY",
+      "fieldKey": "custom_objects.propiedad.vista_principal",
+      "name": "Vista principal",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "vista_secundaria": {
+      "id": "lnhX552Cg7NqnembiDgo",
+      "fieldKey": "custom_objects.propiedad.vista_secundaria",
+      "name": "Vista secundaria",
+      "dataType": "TEXT"
+    },
+    "aire_acondicionado": {
+      "id": "yVdinQ8WnHF2axahxSda",
+      "fieldKey": "custom_objects.propiedad.aire_acondicionado",
+      "name": "Aire acondicionado",
+      "dataType": "CHECKBOX"
+    },
+    "fotos_urls": {
+      "id": "8oQ4SjFadjIMI6Cm48Uw",
+      "fieldKey": "custom_objects.propiedad.fotos_urls",
+      "name": "URLs de fotos",
+      "dataType": "LARGE_TEXT"
+    },
+    "video_url": {
+      "id": "gEmXCIQtNMeXZZoIZhpT",
+      "fieldKey": "custom_objects.propiedad.video_url",
+      "name": "Video URL",
+      "dataType": "TEXT"
+    },
+    "tour_virtual_url": {
+      "id": "OQte8fzskVLNtQqAGCkz",
+      "fieldKey": "custom_objects.propiedad.tour_virtual_url",
+      "name": "Tour virtual URL",
+      "dataType": "TEXT"
+    },
+    "planos_url": {
+      "id": "PcqLGmCqFXQJ63HKowqV",
+      "fieldKey": "custom_objects.propiedad.planos_url",
+      "name": "Planos URL",
+      "dataType": "TEXT"
+    },
+    "slug_url": {
+      "id": "iu2gbIku9AdZHqC1eXHR",
+      "fieldKey": "custom_objects.propiedad.slug_url",
+      "name": "Slug URL",
+      "dataType": "TEXT"
+    },
+    "url_organica": {
+      "id": "EtAtvHm8stKje8Uz1jJG",
+      "fieldKey": "custom_objects.propiedad.url_organica",
+      "name": "URL orgánica",
+      "dataType": "TEXT"
+    },
+    "fecha_publicacion": {
+      "id": "L5pkdcEMacipztH3pMCi",
+      "fieldKey": "custom_objects.propiedad.fecha_publicacion",
+      "name": "Fecha de publicación",
+      "dataType": "DATE"
+    },
+    "titulo": {
+      "id": "El1XJcQfrScrUc80VfhG",
+      "fieldKey": "custom_objects.propiedad.titulo",
+      "name": "Título",
+      "dataType": "TEXT"
+    }
+  }
+}

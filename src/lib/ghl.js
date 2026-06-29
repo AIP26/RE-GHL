@@ -132,6 +132,59 @@ export function ghlClient(accessToken) {
 // ---------------------------------------------------------------------
 export async function getUserById(accessToken, userId) {
   const { data } = await ghlClient(accessToken).get(`/users/${userId}`);
-  // GHL devuelve {user: {...}} o {...} según el endpoint. Normalizamos.
   return data?.user || data;
+}
+
+// ---------------------------------------------------------------------
+// Custom Objects API v2 — schema + fields
+// ---------------------------------------------------------------------
+
+/** Crea un Custom Object schema. GHL retorna { object: { key, id, ... } }
+ *  donde `key` viene ya prefijado como "custom_object.<tu-key>". */
+export async function createCustomObjectSchema(accessToken, payload) {
+  const { data } = await ghlClient(accessToken).post('/objects/', payload);
+  return data?.object || data;
+}
+
+/** GET schema por key (con prefijo custom_object.). 404 si no existe. */
+export async function getCustomObjectByKey(accessToken, fullKey, locationId) {
+  const { data } = await ghlClient(accessToken).get(
+    `/objects/${encodeURIComponent(fullKey)}`,
+    { params: { locationId } }
+  );
+  return data?.object || data;
+}
+
+/** Lista los custom fields de un object schema y también devuelve las folders. */
+export async function listCustomFieldsForObject(accessToken, fullObjectKey, locationId) {
+  const cli = ghlClient(accessToken);
+  try {
+    const { data } = await cli.get(
+      `/custom-fields/object-key/${encodeURIComponent(fullObjectKey)}`,
+      { params: { locationId } }
+    );
+    return {
+      fields: data?.fields || [],
+      folders: data?.folders || [],
+    };
+  } catch (err) {
+    // Fallback: si el endpoint moderno falla, intentamos el legado
+    try {
+      const { data } = await cli.get('/custom-fields/', {
+        params: { locationId, objectType: fullObjectKey },
+      });
+      return {
+        fields: data?.fields || data?.customFields || [],
+        folders: data?.folders || [],
+      };
+    } catch {
+      throw err;
+    }
+  }
+}
+
+/** Crea un custom field en un Custom Object. */
+export async function createCustomField(accessToken, payload) {
+  const { data } = await ghlClient(accessToken).post('/custom-fields/', payload);
+  return data?.field || data?.customField || data;
 }
