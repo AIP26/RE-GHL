@@ -1,16 +1,20 @@
 // Carga y validación de variables de entorno.
-// Fallar rápido si falta algo crítico (sin valores default).
+// IMPORTANTE: todas las propiedades de `env` son GETTERS lazy que leen
+// `process.env` en cada acceso. Esto evita el bug de "snapshot a tiempo
+// de import" donde un valor undefined al momento de evaluar el módulo
+// quedaba congelado para toda la vida del proceso (ej. en Railway).
 import 'dotenv/config';
 
-const REQUIRED = [
-  // Se vuelven obligatorias a medida que avanzamos en los pasos.
-  // Por ahora solo NODE_ENV / PORT son indispensables para arrancar.
-  'NODE_ENV',
-  'PORT',
-];
+const REQUIRED = ['NODE_ENV', 'PORT'];
 
-// Variables que serán requeridas en pasos posteriores. Las listamos para
-// documentación, pero NO fallamos si faltan en esta fase inicial.
+const missing = REQUIRED.filter((k) => !process.env[k]);
+if (missing.length) {
+  // eslint-disable-next-line no-console
+  console.error(`[env] Faltan variables obligatorias: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
+// Variables que serán requeridas en pasos posteriores (solo documentación).
 export const FUTURE_REQUIRED = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY',
@@ -25,44 +29,51 @@ export const FUTURE_REQUIRED = [
   'GOOGLE_MAPS_API_KEY',
 ];
 
-const missing = REQUIRED.filter((k) => !process.env[k]);
-if (missing.length) {
-  // eslint-disable-next-line no-console
-  console.error(`[env] Faltan variables obligatorias: ${missing.join(', ')}`);
-  process.exit(1);
+/**
+ * Construye un objeto con getters que leen `process.env` en cada acceso.
+ * - Valor string: nombre de la env var
+ * - Valor función: resolver custom (para defaults, parseo numérico, etc.)
+ */
+function lazy(map) {
+  const obj = {};
+  for (const [key, envOrFn] of Object.entries(map)) {
+    const getter = typeof envOrFn === 'function' ? envOrFn : () => process.env[envOrFn];
+    Object.defineProperty(obj, key, { get: getter, enumerable: true });
+  }
+  return obj;
 }
 
 export const env = {
-  nodeEnv: process.env.NODE_ENV,
-  port: Number(process.env.PORT),
-  appDomain: process.env.APP_DOMAIN,
-  logLevel: process.env.LOG_LEVEL || 'info',
+  get nodeEnv() { return process.env.NODE_ENV; },
+  get port() { return Number(process.env.PORT); },
+  get appDomain() { return process.env.APP_DOMAIN; },
+  get logLevel() { return process.env.LOG_LEVEL || 'info'; },
 
-  supabase: {
-    url: process.env.SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_KEY,
-  },
-  ghl: {
-    clientId: process.env.GHL_CLIENT_ID,
-    clientSecret: process.env.GHL_CLIENT_SECRET,
-    redirectUri: process.env.GHL_REDIRECT_URI,
-    scopes: process.env.GHL_SCOPES,
-    userType: process.env.GHL_USER_TYPE || 'Location',
-    webhookPublicKey: process.env.GHL_WEBHOOK_PUBLIC_KEY,
-  },
-  encryption: {
-    key: process.env.ENCRYPTION_KEY,
-  },
-  jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
-  },
-  cloudinary: {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    apiSecret: process.env.CLOUDINARY_API_SECRET,
-  },
-  googleMaps: {
-    apiKey: process.env.GOOGLE_MAPS_API_KEY,
-  },
+  supabase: lazy({
+    url: 'SUPABASE_URL',
+    serviceKey: 'SUPABASE_SERVICE_KEY',
+  }),
+  ghl: lazy({
+    clientId: 'GHL_CLIENT_ID',
+    clientSecret: 'GHL_CLIENT_SECRET',
+    redirectUri: 'GHL_REDIRECT_URI',
+    scopes: 'GHL_SCOPES',
+    userType: () => process.env.GHL_USER_TYPE || 'Location',
+    webhookPublicKey: 'GHL_WEBHOOK_PUBLIC_KEY',
+  }),
+  encryption: lazy({
+    key: 'ENCRYPTION_KEY',
+  }),
+  jwt: lazy({
+    secret: 'JWT_SECRET',
+    expiresIn: () => process.env.JWT_EXPIRES_IN || '23h',
+  }),
+  cloudinary: lazy({
+    cloudName: 'CLOUDINARY_CLOUD_NAME',
+    apiKey: 'CLOUDINARY_API_KEY',
+    apiSecret: 'CLOUDINARY_API_SECRET',
+  }),
+  googleMaps: lazy({
+    apiKey: 'GOOGLE_MAPS_API_KEY',
+  }),
 };

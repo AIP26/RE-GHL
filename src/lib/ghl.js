@@ -9,14 +9,33 @@ export const GHL_OAUTH_TOKEN = `${GHL_API_BASE}/oauth/token`;
 export const GHL_API_VERSION = '2021-07-28';
 
 // ---------------------------------------------------------------------
+// Asserción defensiva: si alguna var crítica falta en el momento de
+// construir la URL, fallamos ruidosamente en vez de generar una URL
+// con `client_id=undefined`.
+// ---------------------------------------------------------------------
+function assertOAuthConfigured() {
+  const missing = [];
+  if (!env.ghl.clientId)     missing.push('GHL_CLIENT_ID');
+  if (!env.ghl.clientSecret) missing.push('GHL_CLIENT_SECRET');
+  if (!env.ghl.redirectUri)  missing.push('GHL_REDIRECT_URI');
+  if (missing.length) {
+    throw new Error(
+      `GHL OAuth no configurado en runtime: faltan ${missing.join(', ')}. ` +
+      `Verifica las variables de entorno del proyecto (Railway -> Variables).`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
 // OAuth: URL de autorización
 // ---------------------------------------------------------------------
 export function getAuthorizeUrl(state) {
+  assertOAuthConfigured();
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: env.ghl.clientId,
     redirect_uri: env.ghl.redirectUri,
-    scope: env.ghl.scopes,
+    scope: env.ghl.scopes || '',
   });
   if (state) params.set('state', state);
   return `${GHL_OAUTH_AUTHORIZE}?${params.toString()}`;
@@ -26,6 +45,7 @@ export function getAuthorizeUrl(state) {
 // OAuth: intercambio code -> tokens
 // ---------------------------------------------------------------------
 export async function exchangeCodeForToken(code) {
+  assertOAuthConfigured();
   const body = new URLSearchParams({
     client_id: env.ghl.clientId,
     client_secret: env.ghl.clientSecret,
@@ -49,6 +69,7 @@ export async function exchangeCodeForToken(code) {
 // OAuth: refresh
 // ---------------------------------------------------------------------
 export async function refreshAccessToken(refreshToken) {
+  assertOAuthConfigured();
   const body = new URLSearchParams({
     client_id: env.ghl.clientId,
     client_secret: env.ghl.clientSecret,
