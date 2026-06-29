@@ -9,6 +9,23 @@ export const GHL_OAUTH_TOKEN = `${GHL_API_BASE}/oauth/token`;
 export const GHL_API_VERSION = '2021-07-28';
 
 // ---------------------------------------------------------------------
+// Scopes solicitados por la app — HARDCODEADOS a propósito.
+// No leemos de env var para evitar OAuth roto si la variable no está
+// presente en producción (caso real de Railway que ya nos mordió).
+// Si necesitas cambiar scopes, edítalos aquí y republica en el Marketplace.
+// ---------------------------------------------------------------------
+export const GHL_SCOPES = [
+  'contacts.readonly',
+  'contacts.write',
+  'locations.readonly',
+  'oauth.readonly',
+  'oauth.write',
+  'custom-objects.readonly',
+  'custom-objects.write',
+  'users.readonly',
+].join(' ');
+
+// ---------------------------------------------------------------------
 // Asserción defensiva: si alguna var crítica falta en el momento de
 // construir la URL, fallamos ruidosamente en vez de generar una URL
 // con `client_id=undefined`.
@@ -35,7 +52,7 @@ export function getAuthorizeUrl(state) {
     response_type: 'code',
     client_id: env.ghl.clientId,
     redirect_uri: env.ghl.redirectUri,
-    scope: env.ghl.scopes || '',
+    scope: GHL_SCOPES,
   });
   if (state) params.set('state', state);
   return `${GHL_OAUTH_AUTHORIZE}?${params.toString()}`;

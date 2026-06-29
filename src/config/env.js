@@ -57,7 +57,6 @@ export const env = {
     clientId: 'GHL_CLIENT_ID',
     clientSecret: 'GHL_CLIENT_SECRET',
     redirectUri: 'GHL_REDIRECT_URI',
-    scopes: 'GHL_SCOPES',
     userType: () => process.env.GHL_USER_TYPE || 'Location',
     webhookPublicKey: 'GHL_WEBHOOK_PUBLIC_KEY',
   }),
