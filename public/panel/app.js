@@ -60,7 +60,9 @@
   // -------------------------------------------------------------------
   // Form schema — replica el Master Context v2.6 y matchea ghl-field-ids.json
   // -------------------------------------------------------------------
-  const AMENIDADES = ['Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico'];
+  const AMENIDADES = ['Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción'];
+  const NORMAS = ['Pet friendly','Permite rentas vacacionales','Solo familias','No niños'];
+  const MONEDAS = ['USD','MXN','CAD'];
 
   const SECTIONS = [
     { title: 'Información general', fields: [
@@ -68,15 +70,17 @@
       { key: 'descripcion', label: 'Descripción', type: 'textarea', required: true, full: true },
       { key: 'tipo_operacion', label: 'Tipo de operación', type: 'select', required: true, options: ['Venta','Renta'] },
       { key: 'tipo_inmueble', label: 'Tipo de inmueble', type: 'select', required: true, options: ['Casa','Departamento','Local','Terreno','Oficina','Bodega','Villa','Penthouse'] },
-      { key: 'estado', label: 'Estado', type: 'select', required: true, options: ['Disponible','Vendida','Rentada','Pausada'], defaultValue: 'Disponible' },
+      { key: 'estado', label: 'Estado', type: 'select', required: true, options: ['Disponible','Vendida','Rentada','Pausada'] },
       { key: 'etiqueta', label: 'Etiqueta', type: 'select', options: ['','Destacada','Nueva','Oportunidad','Preventa','Remate'] },
       { key: 'preventa', label: 'Preventa', type: 'toggle' },
       { key: 'fecha_entrega', label: 'Fecha estimada de entrega', type: 'date', showIf: (s) => s.preventa },
       { key: 'agente_responsable', label: 'Agente responsable', type: 'agent', required: true },
     ]},
     { title: 'Precio', fields: [
-      { key: 'precio_usd', label: 'Precio USD', type: 'number', required: true },
-      { key: 'precio_mxn', label: 'Precio MXN', type: 'number' },
+      { key: 'precio_principal', label: 'Precio principal', type: 'number', required: true, span: 1 },
+      { key: 'moneda_principal', label: 'Moneda principal', type: 'select', required: true, options: MONEDAS, span: 1 },
+      { key: 'precio_secundario', label: 'Precio secundario (opcional)', type: 'number' },
+      { key: 'moneda_secundaria', label: 'Moneda secundaria', type: 'select', options: ['', ...MONEDAS] },
       { key: 'cuota_mantenimiento', label: 'Cuota mantenimiento (MXN/mes)', type: 'number' },
       { key: 'precio_a_consultar', label: 'Precio a consultar (oculta precio)', type: 'toggle' },
       { key: 'nota_precio', label: 'Nota de precio', type: 'text', span: 2 },
@@ -109,10 +113,17 @@
       { key: 'bodega_storage', label: 'Bodega / Storage', type: 'toggle' },
     ]},
     { title: 'Amenidades', fields: [
-      { key: 'amenidades', label: 'Selecciona las amenidades disponibles', type: 'amenities', full: true },
+      { key: 'amenidades', label: 'Selecciona las amenidades disponibles', type: 'amenities', options: AMENIDADES, full: true },
       { key: 'vista_principal', label: 'Vista principal', type: 'select', options: ['','Calle','Mar','Jardín','Montaña','Ciudad','Laguna','Campo de golf'] },
       { key: 'vista_secundaria', label: 'Vista secundaria', type: 'text' },
       { key: 'aire_acondicionado', label: 'Aire acondicionado', type: 'toggle' },
+    ]},
+    { title: 'Situación y conservación', fields: [
+      { key: 'situacion_legal', label: 'Situación legal', type: 'select', required: true, options: ['Libre de gravamen','Gravamen hipotecario','Gravamen Infonavit','Otro (consultar)'] },
+      { key: 'estado_conservacion', label: 'Estado de conservación', type: 'select', required: true, options: ['Nuevo','Excelente','Bueno','Regular','Necesita remodelación'] },
+    ]},
+    { title: 'Normas de la propiedad', fields: [
+      { key: 'normas', label: 'Selecciona las normas aplicables', type: 'amenities', options: NORMAS, full: true },
     ]},
     { title: 'Fotos y media', fields: [
       { key: 'fotos_urls', label: 'Fotos (arrastra para reordenar — la 1ª es la portada)', type: 'photos', required: true, full: true },
@@ -151,11 +162,28 @@
         }
       }
     }
+    // BACKWARD COMPAT: el PDF, portal público y búsqueda aún leen precio_usd/
+    // precio_mxn. Mantenemos esos campos sincronizados según moneda elegida.
+    // Cualquier valor previo se sobreescribe (no acumulamos legacy errado).
+    out.precio_usd = '';
+    out.precio_mxn = '';
+    const mapPrice = (amount, currency) => {
+      if (amount == null || amount === '' || !currency) return;
+      const n = Number(amount);
+      if (!Number.isFinite(n)) return;
+      if (currency === 'USD') out.precio_usd = n;
+      else if (currency === 'MXN') out.precio_mxn = n;
+      // CAD no tiene legacy → no lo escribimos en USD/MXN
+    };
+    mapPrice(state.precio_principal, state.moneda_principal);
+    mapPrice(state.precio_secundario, state.moneda_secundaria);
+    // Limpia los keys vacíos para no enviarlos
+    if (out.precio_usd === '') delete out.precio_usd;
+    if (out.precio_mxn === '') delete out.precio_mxn;
     return out;
   }
 
   // Convierte el record de GHL (+ _collections) -> state del form para edición.
-  // Es la inversa de serializeForm — debe matchear el tipo de cada field.
   function deserializeFromRecord(record, collections) {
     const props = record?.properties || {};
     const state = { _collections: collections || [] };
@@ -176,6 +204,20 @@
           state[f.key] = v;
         }
       }
+    }
+    // BACKWARD COMPAT: si la propiedad no tiene los nuevos precios pero sí
+    // los legacy (precio_usd/precio_mxn), los mapeamos para que el form
+    // muestre algo coherente al editar.
+    if (!state.precio_principal && props.precio_usd) {
+      state.precio_principal = Number(props.precio_usd);
+      state.moneda_principal = 'USD';
+      if (props.precio_mxn) {
+        state.precio_secundario = Number(props.precio_mxn);
+        state.moneda_secundaria = 'MXN';
+      }
+    } else if (!state.precio_principal && props.precio_mxn) {
+      state.precio_principal = Number(props.precio_mxn);
+      state.moneda_principal = 'MXN';
     }
     return state;
   }
@@ -284,11 +326,19 @@
       case 'textarea':
         control = html`<textarea id=${field.key} className="form-textarea" rows="4" value=${value || ''} onInput=${(e) => set(field.key, e.target.value)} />`;
         break;
-      case 'select':
-        control = html`<select id=${field.key} className="form-select" value=${value || ''} onChange=${(e) => set(field.key, e.target.value)}>
-          ${field.options.map((opt) => html`<option key=${opt} value=${opt}>${opt || '— ninguno —'}</option>`)}
+      case 'select': {
+        // Para campos requeridos sin opción vacía explícita, anteponer un
+        // placeholder "— Selecciona —" para forzar elección consciente del usuario.
+        // (Evita el bug visual donde la primera opción parecía "seleccionada"
+        // pero el state seguía sin valor real.)
+        const hasEmptyOpt = field.options.includes('');
+        const showPlaceholder = field.required && !hasEmptyOpt;
+        control = html`<select id=${field.key} className="form-select" value=${value || ''} onChange=${(e) => set(field.key, e.target.value)} required=${!!field.required}>
+          ${showPlaceholder ? html`<option value="" disabled>— Selecciona —</option>` : null}
+          ${field.options.map((opt) => html`<option key=${opt} value=${opt}>${opt === '' ? '— ninguno —' : opt}</option>`)}
         </select>`;
         break;
+      }
       case 'toggle':
         return html`<div className=${'form-field ' + span}>
           <label className="toggle">
@@ -314,11 +364,14 @@
           if (p.lng) set('longitud', p.lng);
         }} />`;
         break;
-      case 'amenities':
+      case 'amenities': {
+        // Lista de opciones desde la definición del field. Fallback a la
+        // constante global por retro-compatibilidad si algún caller la omitiera.
+        const opts = field.options || AMENIDADES;
         return html`<div className=${'form-field ' + span}>
           ${label}
           <div className="amen-grid">
-            ${AMENIDADES.map((opt) => {
+            ${opts.map((opt) => {
               const checked = Array.isArray(value) && value.includes(opt);
               return html`<label key=${opt} className=${'amen-item' + (checked ? ' checked' : '')}>
                 <input type="checkbox" checked=${checked} onChange=${(e) => {
@@ -330,6 +383,7 @@
             })}
           </div>
         </div>`;
+      }
       case 'photos':
         return html`<div className=${'form-field ' + span}>
           ${label}
@@ -338,18 +392,7 @@
       case 'collections':
         return html`<div className=${'form-field ' + span}>
           ${label}
-          <div className="coll-list">
-            ${ctx.colecciones.length === 0 ? html`<span className="form-help">Aún no tienes colecciones — créalas en el menú "Colecciones".</span>` : null}
-            ${ctx.colecciones.map((c) => {
-              const sel = (state._collections || []).includes(c.id);
-              return html`<span key=${c.id} className=${'coll-pill' + (sel ? ' selected' : '')} onClick=${() => {
-                const arr = [...(state._collections || [])];
-                const i = arr.indexOf(c.id);
-                if (i >= 0) arr.splice(i, 1); else arr.push(c.id);
-                set('_collections', arr);
-              }}>${c.nombre}</span>`;
-            })}
-          </div>
+          <${CollectionsField} state=${state} set=${set} ctx=${ctx} />
         </div>`;
       default:
         control = html`<input className="form-input" value=${value || ''} onInput=${(e) => set(field.key, e.target.value)} />`;
@@ -395,6 +438,8 @@
   function PhotosInput({ value, onChange }) {
     const [uploading, setUploading] = useState(0);
     const dragIdx = useRef(null);
+    const [dragging, setDragging] = useState(null); // índice que está siendo arrastrado (visual)
+    const [dragOver, setDragOver] = useState(null); // índice sobre el que está el cursor (visual)
 
     const uploadFiles = async (files) => {
       const arr = Array.from(files);
@@ -414,7 +459,6 @@
           const r = await fetch(sign.uploadUrl, { method: 'POST', body: fd });
           if (!r.ok) { toast('Error subiendo foto', 'error'); setUploading((n) => n - 1); continue; }
           const j = await r.json();
-          // Preferimos la URL WebP eager si Cloudinary la generó; si no, secure_url
           const eagerUrl = j.eager?.[0]?.secure_url || j.eager?.[0]?.url || j.secure_url;
           uploaded.push(eagerUrl);
           setUploading((n) => n - 1);
@@ -432,24 +476,55 @@
       onChange(arr);
     };
 
-    const onDragStart = (i) => (e) => { dragIdx.current = i; e.dataTransfer.effectAllowed = 'move'; };
-    const onDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+    // Drag handlers:
+    // - Firefox exige `setData()` o el drag NO inicia, por eso pasamos un texto vacío.
+    // - El <img> interno tiene draggable=false para que el navegador no inicie un
+    //   drag de imagen (su comportamiento por defecto) que rompe el del wrapper.
+    // - `dragging` y `dragOver` son sólo para feedback visual; el índice real
+    //   se guarda en `dragIdx.current` (ref) para evitar staleness.
+    const onDragStart = (i) => (e) => {
+      dragIdx.current = i;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) { /* algunos browsers no aceptan */ }
+      setDragging(i);
+    };
+    const onDragEnd = () => { dragIdx.current = null; setDragging(null); setDragOver(null); };
+    const onDragOver = (i) => (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOver !== i) setDragOver(i);
+    };
+    const onDragLeave = (i) => () => { if (dragOver === i) setDragOver(null); };
     const onDrop = (i) => (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const from = dragIdx.current;
-      if (from == null || from === i) return;
+      setDragging(null); setDragOver(null);
+      if (from == null || from === i || !Array.isArray(value)) { dragIdx.current = null; return; }
       const arr = [...value];
+      if (from < 0 || from >= arr.length) { dragIdx.current = null; return; }
       const [moved] = arr.splice(from, 1);
-      arr.splice(i, 0, moved);
-      onChange(arr);
+      const insertAt = Math.max(0, Math.min(i, arr.length));
+      arr.splice(insertAt, 0, moved);
       dragIdx.current = null;
+      onChange(arr);
     };
 
     return html`
       <div className="photos">
         ${(value || []).map((url, i) => html`
-          <div key=${url} className="photo-thumb" draggable=${true} onDragStart=${onDragStart(i)} onDragOver=${onDragOver} onDrop=${onDrop(i)}>
-            <img src=${url} alt="" />
+          <div
+            key=${url + '#' + i}
+            className=${'photo-thumb' + (dragging === i ? ' dragging' : '') + (dragOver === i && dragging !== i ? ' drop-target' : '')}
+            draggable=${true}
+            onDragStart=${onDragStart(i)}
+            onDragEnd=${onDragEnd}
+            onDragOver=${onDragOver(i)}
+            onDragLeave=${onDragLeave(i)}
+            onDrop=${onDrop(i)}
+            data-testid=${'photo-thumb-' + i}
+          >
+            <img src=${url} alt="" draggable=${false} />
             ${i === 0 ? html`<span className="badge">PORTADA</span>` : null}
             <button className="rm" type="button" onClick=${() => removeAt(i)} title="Quitar">×</button>
           </div>
@@ -462,6 +537,90 @@
       </div>
       ${uploading > 0 ? html`<div className="photo-uploading">Subiendo ${uploading} foto(s)…</div>` : null}
     `;
+  }
+
+  // CollectionsField — chips selección + opción "+ Crear nueva" inline.
+  // Crear: muestra input + Crear/Cancelar; POSTea, recarga la lista global,
+  // y auto-asigna la colección recién creada a la propiedad actual.
+  function CollectionsField({ state, set, ctx }) {
+    const [creating, setCreating] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [saving, setSaving] = useState(false);
+    const inputRef = useRef(null);
+
+    const startCreate = () => {
+      setCreating(true);
+      setNewName('');
+      // Focus después de que React monte el input
+      setTimeout(() => inputRef.current?.focus(), 30);
+    };
+    const cancelCreate = () => { setCreating(false); setNewName(''); };
+
+    const submitCreate = async () => {
+      const name = newName.trim();
+      if (!name) { toast('Escribe un nombre para la colección', 'error'); return; }
+      setSaving(true);
+      try {
+        const r = await api('/collection', { method: 'POST', body: { nombre: name } });
+        const created = r.coleccion;
+        if (created?.id) {
+          await ctx.reloadCollections();
+          // Auto-seleccionar la recién creada
+          const arr = [...(state._collections || [])];
+          if (!arr.includes(created.id)) arr.push(created.id);
+          set('_collections', arr);
+          toast('Colección "' + created.nombre + '" creada y asignada ✓', 'success');
+        }
+        cancelCreate();
+      } catch (err) {
+        toast('Error al crear: ' + (err.detail?.message || err.message), 'error');
+      } finally { setSaving(false); }
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitCreate(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelCreate(); }
+    };
+
+    return html`<div className="coll-list" data-testid="collections-field">
+      ${ctx.colecciones.length === 0 && !creating
+        ? html`<span className="form-help">Aún no tienes colecciones — crea la primera abajo.</span>`
+        : null}
+      ${ctx.colecciones.map((c) => {
+        const sel = (state._collections || []).includes(c.id);
+        return html`<span
+          key=${c.id}
+          data-testid=${'coll-pill-' + c.slug}
+          className=${'coll-pill' + (sel ? ' selected' : '')}
+          onClick=${() => {
+            const arr = [...(state._collections || [])];
+            const i = arr.indexOf(c.id);
+            if (i >= 0) arr.splice(i, 1); else arr.push(c.id);
+            set('_collections', arr);
+          }}
+        >${c.nombre}</span>`;
+      })}
+      ${creating ? html`<span className="coll-pill coll-pill-create" data-testid="collection-create-inline" onClick=${(e) => e.stopPropagation()}>
+        <input
+          ref=${inputRef}
+          data-testid="collection-create-input"
+          className="coll-pill-input"
+          value=${newName}
+          onInput=${(e) => setNewName(e.target.value)}
+          onKeyDown=${onKeyDown}
+          placeholder="Nombre de la colección…"
+          maxLength="60"
+          disabled=${saving}
+        />
+        <button type="button" data-testid="collection-create-save" className="coll-pill-btn primary" onClick=${submitCreate} disabled=${saving || !newName.trim()}>${saving ? '…' : 'Crear'}</button>
+        <button type="button" data-testid="collection-create-cancel" className="coll-pill-btn" onClick=${cancelCreate} disabled=${saving}>×</button>
+      </span>` : html`<button
+        type="button"
+        data-testid="collection-create-btn"
+        className="coll-pill coll-pill-add"
+        onClick=${startCreate}
+      >＋ Crear nueva colección</button>`}
+    </div>`;
   }
 
   // -------------------------------------------------------------------

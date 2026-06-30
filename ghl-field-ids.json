@@ -4,11 +4,11 @@
   "folderId": "AG5F4RBZsGpMDnvb5xek",
   "folderName": "Propiedad Info",
   "locationId": "cNg6MFQcxv8bZnwCppoM",
-  "generatedAt": "2026-06-29T23:15:11.806Z",
+  "generatedAt": "2026-06-30T19:24:05.457Z",
   "summary": {
-    "defined": 48,
-    "created": 47,
-    "skipped": 1,
+    "defined": 55,
+    "created": 7,
+    "skipped": 48,
     "failed": 0
   },
   "fields": {
@@ -18,10 +18,22 @@
       "name": "Descripción",
       "dataType": "LARGE_TEXT"
     },
+    "precio_principal": {
+      "id": "CleUETucamUXEIMBDeTZ",
+      "fieldKey": "custom_objects.propiedad.precio_principal",
+      "name": "Precio principal",
+      "dataType": "NUMERICAL"
+    },
     "tipo_operacion": {
       "id": "4J3wuaAiY4cSCsfXTc87",
       "fieldKey": "custom_objects.propiedad.tipo_operacion",
       "name": "Tipo de operación",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "moneda_principal": {
+      "id": "8fmpNCxdeKFasyPGSkHH",
+      "fieldKey": "custom_objects.propiedad.moneda_principal",
+      "name": "Moneda principal",
       "dataType": "SINGLE_OPTIONS"
     },
     "tipo_inmueble": {
@@ -30,10 +42,22 @@
       "name": "Tipo de inmueble",
       "dataType": "SINGLE_OPTIONS"
     },
+    "precio_secundario": {
+      "id": "brBJt2tBdVenWTwyu4yR",
+      "fieldKey": "custom_objects.propiedad.precio_secundario",
+      "name": "Precio secundario",
+      "dataType": "NUMERICAL"
+    },
     "estado": {
       "id": "Syu3yxvaaFSvBr8U0RRz",
       "fieldKey": "custom_objects.propiedad.estado",
       "name": "Estado de la propiedad",
+      "dataType": "SINGLE_OPTIONS"
+    },
+    "moneda_secundaria": {
+      "id": "iVSifuicOc15aKsMSZqi",
+      "fieldKey": "custom_objects.propiedad.moneda_secundaria",
+      "name": "Moneda secundaria",
       "dataType": "SINGLE_OPTIONS"
     },
     "etiqueta": {
@@ -42,17 +66,35 @@
       "name": "Etiqueta",
       "dataType": "SINGLE_OPTIONS"
     },
+    "situacion_legal": {
+      "id": "mZZtqIwfg3eODHtWaCMv",
+      "fieldKey": "custom_objects.propiedad.situacion_legal",
+      "name": "Situación legal",
+      "dataType": "SINGLE_OPTIONS"
+    },
     "preventa": {
       "id": "wdbSKGyrw8ZFhn4bWlj1",
       "fieldKey": "custom_objects.propiedad.preventa",
       "name": "Preventa",
       "dataType": "CHECKBOX"
     },
+    "estado_conservacion": {
+      "id": "9TJwVgtvEtl7otUNt2Mp",
+      "fieldKey": "custom_objects.propiedad.estado_conservacion",
+      "name": "Estado de conservación",
+      "dataType": "SINGLE_OPTIONS"
+    },
     "fecha_entrega": {
       "id": "pqjQ1KUWiFyB9yvraa6x",
       "fieldKey": "custom_objects.propiedad.fecha_entrega",
       "name": "Fecha estimada de entrega",
       "dataType": "DATE"
+    },
+    "normas": {
+      "id": "sdUKSDwydbCDAqqkIOUE",
+      "fieldKey": "custom_objects.propiedad.normas",
+      "name": "Normas de la propiedad",
+      "dataType": "LARGE_TEXT"
     },
     "agente_responsable": {
       "id": "De3nxK8dFqMKsYjf53y0",

@@ -49,6 +49,12 @@ const FIELDS = [
   // Precio
   { fieldKey: 'precio_usd',          name: 'Precio USD',                dataType: 'NUMERICAL' },
   { fieldKey: 'precio_mxn',          name: 'Precio MXN',                dataType: 'NUMERICAL' },
+  // Nuevos campos genéricos para soportar USD/MXN/CAD (sustituye visualmente
+  // a precio_usd/precio_mxn pero los conservamos para retro-compatibilidad).
+  { fieldKey: 'precio_principal',    name: 'Precio principal',          dataType: 'NUMERICAL' },
+  { fieldKey: 'moneda_principal',    name: 'Moneda principal',          dataType: 'SINGLE_OPTIONS', options: ['USD', 'MXN', 'CAD'] },
+  { fieldKey: 'precio_secundario',   name: 'Precio secundario',         dataType: 'NUMERICAL' },
+  { fieldKey: 'moneda_secundaria',   name: 'Moneda secundaria',         dataType: 'SINGLE_OPTIONS', options: ['USD', 'MXN', 'CAD'] },
   { fieldKey: 'precio_a_consultar',  name: 'Precio a consultar',        dataType: 'CHECKBOX', options: ['Sí'] },
   { fieldKey: 'nota_precio',         name: 'Nota de precio',            dataType: 'TEXT' },
   { fieldKey: 'cuota_mantenimiento', name: 'Cuota de mantenimiento',    dataType: 'NUMERICAL' },
@@ -85,6 +91,13 @@ const FIELDS = [
   { fieldKey: 'vista_principal',     name: 'Vista principal',           dataType: 'SINGLE_OPTIONS', options: ['Calle','Mar','Jardín','Montaña','Ciudad','Laguna','Campo de golf'] },
   { fieldKey: 'vista_secundaria',    name: 'Vista secundaria',          dataType: 'TEXT' },
   { fieldKey: 'aire_acondicionado',  name: 'Aire acondicionado',        dataType: 'CHECKBOX', options: ['Sí'] },
+
+  // Situación y conservación (nuevos campos QA bloque 3)
+  { fieldKey: 'situacion_legal',     name: 'Situación legal',           dataType: 'SINGLE_OPTIONS', options: ['Libre de gravamen','Gravamen hipotecario','Gravamen Infonavit','Otro (consultar)'] },
+  { fieldKey: 'estado_conservacion', name: 'Estado de conservación',    dataType: 'SINGLE_OPTIONS', options: ['Nuevo','Excelente','Bueno','Regular','Necesita remodelación'] },
+
+  // Normas de la propiedad (CSV en LARGE_TEXT — igual patrón que `amenidades`)
+  { fieldKey: 'normas',              name: 'Normas de la propiedad',    dataType: 'LARGE_TEXT' },
 
   // Fotos y media
   { fieldKey: 'fotos_urls',          name: 'URLs de fotos',             dataType: 'LARGE_TEXT' },
