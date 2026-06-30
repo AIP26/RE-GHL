@@ -586,8 +586,8 @@ function renderCTA(p, agent, brand, record) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
         <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-1pag" style="font-size:12px;padding:8px 6px">Con datos · 1 pág</a>
         <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="font-size:12px;padding:8px 6px">Con datos · 2 págs</a>
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-1pag" style="font-size:12px;padding:8px 6px">Neutral · 1 pág</a>
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-2pag" style="font-size:12px;padding:8px 6px">Neutral · 2 págs</a>
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-1pag" style="font-size:12px;padding:8px 6px">Orgánico · 1 pág</a>
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-2pag" style="font-size:12px;padding:8px 6px">Orgánico · 2 págs</a>
       </div>
     </div>` : '';
 

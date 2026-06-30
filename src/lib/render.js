@@ -349,8 +349,8 @@ footer.site-foot .row { display: grid; gap: 18px; }
 footer.site-foot .brand { color: #fff; font-weight: 800; font-size: 18px; }
 footer.site-foot a { color: #cbd5e1; }
 footer.site-foot a:hover { color: #fff; }
-footer.site-foot .associations { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-footer.site-foot .associations img { height: 28px; opacity: .75; background: #fff; padding: 4px 6px; border-radius: 4px; }
+footer.site-foot .associations { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; align-items: center; }
+footer.site-foot .associations img { height: 36px; width: auto; opacity: .9; }
 
 /* Filters */
 .filters {
