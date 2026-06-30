@@ -207,7 +207,7 @@ r.get('/p/:slug', async (req, res, next) => {
     // Amenidades vienen como texto separado por comas
     const amenidades = (p.amenidades || '').split(',').map((s) => s.trim()).filter(Boolean);
 
-    const ctaBlock = renderCTA(p, agent, brand);
+    const ctaBlock = renderCTA(p, agent, brand, record);
     const showMap = p.latitud && p.longitud && !p.ocultar_direccion_exacta;
 
     const html =
@@ -323,6 +323,62 @@ r.get('/p/:slug', async (req, res, next) => {
     res.type('html').send(html);
   } catch (err) { next(err); }
 });
+
+// ---------------------------------------------------------------------
+// 3.b) PDF de detalle público (pickle del CTA del portal)
+//      /p/:slug/pdf?v=con-agente-1pag  → stream del PDF
+// ---------------------------------------------------------------------
+r.get('/p/:slug/pdf', async (req, res, next) => {
+  try {
+    const tenantId = req.portalTenantId;
+    const record = await findPropertyBySlug(tenantId, req.params.slug);
+    if (!record) return notFound(res, null, 'Propiedad no encontrada');
+
+    const VERSIONS = new Set(['con-agente-1pag', 'con-agente-2pag', 'sin-agente-1pag', 'sin-agente-2pag']);
+    const v = VERSIONS.has(req.query.v) ? req.query.v : 'con-agente-1pag';
+    const withAgent = v.startsWith('con-agente');
+    const twoPages = v.endsWith('2pag');
+
+    const [brand, agents] = await Promise.all([
+      loadBrand(tenantId),
+      loadAgents(tenantId),
+    ]);
+    const agent = agents[record.properties?.agente_responsable] || null;
+
+    let baseUrl = null;
+    if (!withAgent) {
+      // Generamos/recuperamos ficha orgánica para que las fotos del PDF
+      // sin-agente apunten a ficha.{APP_DOMAIN}/{id}
+      const fichaId = await ensurePublicFichaForProperty(tenantId, record.id);
+      baseUrl = fichaId ? `https://ficha.${process.env.APP_DOMAIN || 'mktscaled.com'}/${fichaId}` : null;
+    }
+
+    const { buildPropertyPDF } = await import('../lib/pdf.js');
+    const doc = await buildPropertyPDF({ record, brand, agent, withAgent, twoPages, baseUrl });
+
+    const fname = `${(record.properties?.slug_url || 'propiedad').replace(/[^a-z0-9-]/gi, '-')}-${v}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fname}"`);
+    doc.pipe(res);
+    doc.end();
+  } catch (err) { next(err); }
+});
+
+async function ensurePublicFichaForProperty(tenantId, propertyId) {
+  const sb = getSupabase();
+  const { data: existing } = await sb
+    .from('fichas_url')
+    .select('id')
+    .eq('tenant_id', tenantId).eq('property_id', propertyId).eq('activa', true)
+    .limit(1).maybeSingle();
+  if (existing) return existing.id;
+  const alph = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = ''; for (let i = 0; i < 6; i++) id += alph[Math.floor(Math.random() * alph.length)];
+  const { error } = await sb.from('fichas_url').insert({
+    id, tenant_id: tenantId, property_id: propertyId, activa: true, vistas: 0,
+  });
+  return error ? null : id;
+}
 
 // ---------------------------------------------------------------------
 // 4) BÚSQUEDA
@@ -448,8 +504,9 @@ r.get('/ficha/:id', async (req, res, next) => {
           <div class="amenities">${amenidades.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>
         </div>` : ''}
 
-        <div style="margin-top:24px">
-          <a href="/api/pdf?ficha=${esc(req.params.id)}" class="btn btn-ghost btn-block">Descargar ficha PDF</a>
+        <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap">
+          <a href="/api/pdf/ficha/${esc(req.params.id)}" class="btn btn-ghost" style="flex:1;min-width:160px">Descargar 1 página</a>
+          <a href="/api/pdf/ficha/${esc(req.params.id)}?pages=2" class="btn btn-ghost" style="flex:1;min-width:160px">Descargar 2 páginas</a>
         </div>
 
         <p class="organic-disclaimer">Ficha técnica · Información sujeta a verificación</p>
@@ -501,7 +558,7 @@ function whatsappFab(brand) {
   </a>`;
 }
 
-function renderCTA(p, agent, brand) {
+function renderCTA(p, agent, brand, record) {
   // Resolución por prioridad: override por propiedad > widget global
   const overrideType = p.cta_tipo;
   const overrideVal = p.cta_valor;
@@ -519,7 +576,21 @@ function renderCTA(p, agent, brand) {
     primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
   }
 
-  const pdfBlock = `<a class="btn btn-ghost btn-block" href="/api/pdf?propertyId=${esc((p && p._record_id) || '')}" style="margin-top:10px">Descargar ficha PDF</a>`;
+  // Selector de versión del PDF.
+  // En el portal del agente NO requerimos sesión — generamos PDFs públicos
+  // vía /api/pdf/ficha/:id (la ficha la creamos al vuelo si no existe).
+  const recId = record?.id || '';
+  const pdfPicker = recId ? `
+    <div class="pdf-picker" style="margin-top:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Ficha PDF</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-1pag" style="font-size:12px;padding:8px 6px">Con datos · 1 pág</a>
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="font-size:12px;padding:8px 6px">Con datos · 2 págs</a>
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-1pag" style="font-size:12px;padding:8px 6px">Neutral · 1 pág</a>
+        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-2pag" style="font-size:12px;padding:8px 6px">Neutral · 2 págs</a>
+      </div>
+    </div>` : '';
+
   const agentBlock = agent ? `
     <div class="agent-card-top">
       ${agent.foto_url ? `<img src="${esc(agent.foto_url)}" alt="${esc(agent.nombre || '')}" />` : `<div class="ph">${esc((agent.nombre || '?').charAt(0))}</div>`}
@@ -535,6 +606,7 @@ function renderCTA(p, agent, brand) {
   return `<div class="agent-card">
     ${agentBlock}
     ${primaryHtml}
+    ${pdfPicker}
   </div>`;
 }
 
