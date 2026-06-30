@@ -42,13 +42,21 @@ function asJpg(url, width = 1200) {
   if (!url || typeof url !== 'string') return null;
   if (!url.includes('/upload/')) return url;
   const transform = `f_jpg,q_auto:good,c_limit,w_${width}`;
-  // Si hay un segmento de transformación viejo justo después de /upload/
-  // (lo detectamos por la presencia de coma o flags antes del /v<num>/),
-  // lo reemplazamos íntegro. Si no, simplemente insertamos.
   const re = /\/upload\/(?:[^/]+\/)?(v\d+\/)/;
-  if (re.test(url)) {
-    return url.replace(re, `/upload/${transform}/$1`);
-  }
+  if (re.test(url)) return url.replace(re, `/upload/${transform}/$1`);
+  return url.replace('/upload/', `/upload/${transform}/`);
+}
+
+/** Cloudinary transform: forzar PNG preservando canal alpha (logos, badges).
+ *  CRÍTICO: NO usar `q_auto` ni `f_auto` para logos — pueden meter `q_auto`
+ *  con compresión lossy o `f_webp` que rompe transparencia en PDFKit.
+ *  Mismo fix que en el portal web (kind=brand sin q_auto). */
+function asPng(url, width = 400) {
+  if (!url || typeof url !== 'string') return null;
+  if (!url.includes('/upload/')) return url;
+  const transform = `f_png,c_limit,w_${width}`;
+  const re = /\/upload\/(?:[^/]+\/)?(v\d+\/)/;
+  if (re.test(url)) return url.replace(re, `/upload/${transform}/$1`);
   return url.replace('/upload/', `/upload/${transform}/`);
 }
 
@@ -131,91 +139,54 @@ function priceBlockText(p, opKind) {
 }
 
 // ---------------------------------------------------------------------
-// Icon primitives (no fonts emoji — vectores PDFKit)
+// Icon primitives — SVG paths reales dibujados con PDFKit (sin fuentes)
 // ---------------------------------------------------------------------
-
-/** Pin rojo (gota invertida) en (x,y). h = altura total. */
-function drawPin(doc, x, y, color = '#dc2626', h = 11) {
-  const r = h * 0.32;
-  const cx = x + r;
-  const cy = y + r;
+// Estrategia: paths definidos en viewbox 24×24 (estándar Material/Lucide).
+// `drawSvgIcon` escala al tamaño objetivo, traslada y pinta. PDFKit
+// soporta SVG path syntax nativo en `doc.path()`.
+function drawSvgIcon(doc, x, y, size, pathD, fillColor) {
   doc.save();
-  // Cuerpo: círculo
-  doc.circle(cx, cy, r).fill(color);
-  // Punta: triángulo descendente
-  doc.moveTo(cx - r * 0.85, cy + r * 0.45)
-    .lineTo(cx + r * 0.85, cy + r * 0.45)
-    .lineTo(cx, y + h)
-    .closePath()
-    .fill(color);
-  // Centro blanco
-  doc.circle(cx, cy, r * 0.32).fill('#ffffff');
+  doc.translate(x, y).scale(size / 24);
+  doc.path(pathD).fill(fillColor);
   doc.restore();
 }
 
-/** Ícono de teléfono (auricular simplificado). */
-function drawPhoneIcon(doc, x, y, color = '#ffffff', size = 11) {
-  doc.save();
-  doc.lineWidth(size * 0.18).strokeColor(color);
-  const s = size;
-  // Forma de auricular: rotada
-  doc.roundedRect(x + s * 0.05, y + s * 0.05, s * 0.4, s * 0.9, s * 0.15).stroke();
-  doc.roundedRect(x + s * 0.55, y + s * 0.05, s * 0.4, s * 0.9, s * 0.15).stroke();
-  doc.moveTo(x + s * 0.25, y + s * 0.7).lineTo(x + s * 0.75, y + s * 0.3).stroke();
-  doc.restore();
+// Pin de ubicación (Material outlined → filled). Tamaño v=24.
+const PATH_PIN = 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z';
+
+// Teléfono (Material filled). Tamaño v=24.
+const PATH_PHONE = 'M6.62 10.79c1.44 2.83 3.76 5.15 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z';
+
+// WhatsApp (logo oficial simplificado, círculo + auricular + cola).
+// Path único que combina el círculo y el auricular interior con regla "even-odd".
+const PATH_WHATSAPP_BG = 'M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.97L2 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.04c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm0 18.13h-.03c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.264 8.264 0 0 1-1.26-4.37c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.82 2.42a8.183 8.183 0 0 1 2.41 5.83c0 4.55-3.7 8.25-8.2 8.25z';
+const PATH_WHATSAPP_HANDSET = 'M16.56 14.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.49-.41-.42-.56-.43-.14-.01-.31-.01-.48-.01-.17 0-.43.06-.66.31-.23.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.57.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.47-.07 1.47-.6 1.68-1.18.2-.58.2-1.07.14-1.18-.06-.11-.23-.17-.48-.3z';
+
+function drawPin(doc, x, y, color, size) {
+  drawSvgIcon(doc, x, y, size, PATH_PIN, color);
+}
+function drawPhoneIcon(doc, x, y, color, size) {
+  drawSvgIcon(doc, x, y, size, PATH_PHONE, color);
+}
+/** WhatsApp con fondo verde + auricular blanco. */
+function drawWhatsAppIcon(doc, x, y, size) {
+  drawSvgIcon(doc, x, y, size, PATH_WHATSAPP_BG, '#25d366');
+  drawSvgIcon(doc, x, y, size, PATH_WHATSAPP_HANDSET, '#ffffff');
 }
 
-/** Ícono WhatsApp (círculo verde con burbuja blanca). */
-function drawWhatsAppIcon(doc, x, y, size = 12) {
-  doc.save();
-  const r = size / 2;
-  doc.circle(x + r, y + r, r).fill('#25d366');
-  // Burbuja blanca interior
-  doc.fillColor('#ffffff');
-  doc.circle(x + r, y + r * 0.95, r * 0.55).fill();
-  // Cola pequeña
-  doc.moveTo(x + r * 0.55, y + r * 1.5)
-    .lineTo(x + r * 0.3, y + r * 1.75)
-    .lineTo(x + r * 0.85, y + r * 1.45)
-    .closePath()
-    .fill();
-  doc.restore();
-}
+// Instagram, Email, Web (para Contact Us en página 2).
+const PATH_INSTAGRAM = 'M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63a5.89 5.89 0 0 0-2.13 1.38A5.89 5.89 0 0 0 .63 4.14C.33 4.9.13 5.78.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.73 1.46 1.38 2.13a5.89 5.89 0 0 0 2.13 1.38c.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56a5.89 5.89 0 0 0 2.13-1.38 5.89 5.89 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.89 5.89 0 0 0-1.38-2.13A5.89 5.89 0 0 0 19.86.63C19.1.33 18.22.13 16.95.07 15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 0 0 5.84 12 6.16 6.16 0 0 0 12 18.16 6.16 6.16 0 0 0 18.16 12 6.16 6.16 0 0 0 12 5.84zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.41-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88z';
+const PATH_EMAIL = 'M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z';
+const PATH_WEB = 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM18.92 8h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.99 7.99 0 0 1 5.08 16zm2.95-8H5.08a7.99 7.99 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z';
 
-/** Ícono Instagram simplificado (cuadrado redondeado con círculo). */
-function drawInstagramIcon(doc, x, y, color = '#ffffff', size = 11) {
-  doc.save();
-  doc.lineWidth(size * 0.12).strokeColor(color);
-  doc.roundedRect(x + 1, y + 1, size - 2, size - 2, size * 0.22).stroke();
-  doc.circle(x + size / 2, y + size / 2, size * 0.22).stroke();
-  doc.circle(x + size * 0.78, y + size * 0.22, size * 0.06).fill(color);
-  doc.restore();
+function drawInstagramIcon(doc, x, y, color, size) {
+  drawSvgIcon(doc, x, y, size, PATH_INSTAGRAM, color);
 }
-
-/** Ícono email (sobre). */
-function drawEmailIcon(doc, x, y, color = '#ffffff', size = 11) {
-  doc.save();
-  doc.lineWidth(size * 0.12).strokeColor(color);
-  doc.rect(x + 1, y + size * 0.2, size - 2, size * 0.6).stroke();
-  doc.moveTo(x + 1, y + size * 0.2).lineTo(x + size / 2, y + size * 0.55).lineTo(x + size - 1, y + size * 0.2).stroke();
-  doc.restore();
+function drawEmailIcon(doc, x, y, color, size) {
+  drawSvgIcon(doc, x, y, size, PATH_EMAIL, color);
 }
-
-/** Ícono web (globo). */
-function drawWebIcon(doc, x, y, color = '#ffffff', size = 11) {
-  doc.save();
-  doc.lineWidth(size * 0.1).strokeColor(color);
-  const r = size / 2 - 1;
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  doc.circle(cx, cy, r).stroke();
-  // Meridianos
-  doc.moveTo(cx, cy - r).lineTo(cx, cy + r).stroke();
-  // Ecuador
-  doc.moveTo(cx - r, cy).lineTo(cx + r, cy).stroke();
-  // Curvas laterales (elipses)
-  doc.ellipse(cx, cy, r * 0.5, r).stroke();
-  doc.restore();
+function drawWebIcon(doc, x, y, color, size) {
+  drawSvgIcon(doc, x, y, size, PATH_WEB, color);
 }
 
 /** Caja con imagen + borde fino del color de marca. */
@@ -261,7 +232,7 @@ export async function buildPropertyPDF({
   const page3Hero = asJpg(photos[3] || photos[0], 1400);
   const gridSix = photos.slice(2, 8).map((u) => asJpg(u, 800));
 
-  const logoUrl = withAgent ? asJpg(brand?.logo_url, 400) : null;
+  const logoUrl = withAgent ? asPng(brand?.logo_url, 400) : null;
   const mapUrl = staticMapUrl(p.latitud, p.longitud);
 
   // Descarga en paralelo
@@ -320,11 +291,12 @@ function drawPage1(ctx) {
   const x = PAGE_MARGIN;
   let y = PAGE_MARGIN;
 
-  // ===== HERO photo full-width =====
+  // ===== HERO photo full-width con opacidad 60% =====
   const HERO_H = 280;
   if (heroBuf) {
     try {
       doc.save();
+      doc.opacity(0.6); // toda la imagen al 60% — efecto "fade" para legibilidad
       doc.rect(x, y, CONTENT_WIDTH, HERO_H).clip();
       doc.image(heroBuf, x, y, { cover: [CONTENT_WIDTH, HERO_H], align: 'center', valign: 'center' });
       doc.restore();
@@ -334,18 +306,19 @@ function drawPage1(ctx) {
   } else {
     doc.rect(x, y, CONTENT_WIDTH, HERO_H).fill('#e5e7eb');
   }
+  doc.opacity(1); // garantizar reset por si el branch del catch dejó algo abierto
 
-  // Logo overlay top-right (solo con-agente)
+  // Logo overlay top-right (solo con-agente) — 100% opacidad, sobre la foto atenuada.
+  // Importante: NO usar fondo de color, el PNG ya tiene transparencia gracias a asPng().
   if (withAgent && logoBuf) {
-    const LOGO_W = 130;
-    const LOGO_H = 70;
-    const lx = x + CONTENT_WIDTH - LOGO_W - 12;
-    const ly = y + 12;
-    // Caja de fondo color de marca semitransparente (sólo color sólido en PDFKit)
+    const LOGO_W = 140;
+    const LOGO_H = 75;
+    const lx = x + CONTENT_WIDTH - LOGO_W - 14;
+    const ly = y + 14;
     doc.save();
-    doc.rect(lx - 8, ly - 8, LOGO_W + 16, LOGO_H + 16).fill(primaryDark);
+    doc.opacity(1);
     try {
-      doc.image(logoBuf, lx, ly, { fit: [LOGO_W, LOGO_H], align: 'center', valign: 'center' });
+      doc.image(logoBuf, lx, ly, { fit: [LOGO_W, LOGO_H], align: 'right', valign: 'top' });
     } catch (e) { /* skip */ }
     doc.restore();
   }
@@ -368,41 +341,52 @@ function drawPage1(ctx) {
   const leftX = x;
   const rightX = x + LEFT_W;
 
-  // --- Bloque color (derecha) ---
+  // --- Bloque color (derecha): EN VENTA/RENTA + copy + viñetas + precio ---
   doc.rect(rightX, BLOCK_TOP, RIGHT_W, BLOCK_H).fill(primary);
 
-  // Operation label "EN VENTA" / "EN RENTA"
   const op = operationLabel(p.tipo_operacion);
-  doc.fillColor('#ffffff');
-  doc.font('Helvetica-Bold').fontSize(28).text(op.line1, rightX + 14, BLOCK_TOP + 22, {
-    width: RIGHT_W - 28, lineBreak: false,
-  });
-  doc.font('Helvetica-Bold').fontSize(38).text(op.line2, rightX + 14, BLOCK_TOP + 52, {
-    width: RIGHT_W - 28, lineBreak: false,
-  });
+  const padX = 16;
+  let ry = BLOCK_TOP + 18;
 
-  // Tagline pequeño (extracto descripción)
-  const tagline = makeTagline(p);
-  if (tagline) {
-    doc.font('Helvetica').fontSize(9.5).fillColor('#ffffff')
-      .text(tagline, rightX + 14, BLOCK_TOP + 102, {
-        width: RIGHT_W - 28, lineGap: 2, height: 72, ellipsis: true,
-      });
+  // "EN" (línea 1, peso medio)
+  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(28)
+    .text(op.line1, rightX + padX, ry, { width: RIGHT_W - padX * 2, lineBreak: false });
+  ry += 32;
+
+  // "VENTA" o "RENTA" (línea 2, peso máximo)
+  doc.font('Helvetica-Bold').fontSize(38)
+    .text(op.line2, rightX + padX, ry, { width: RIGHT_W - padX * 2, lineBreak: false });
+  ry += 50;
+
+  // Texto genérico (copy fijo aprobado por cliente)
+  const COPY_GENERIC = 'Una oportunidad pensada para quienes buscan calidad, ubicación y el respaldo de un proceso confiable de principio a fin.';
+  doc.font('Helvetica').fontSize(9).fillColor('#ffffff')
+    .text(COPY_GENERIC, rightX + padX, ry, {
+      width: RIGHT_W - padX * 2, lineGap: 2, align: 'left',
+    });
+  ry = doc.y + 14;
+
+  // Viñetas según tipo_operacion (4 ítems)
+  const bullets = lateralBullets(op.kind);
+  for (const b of bullets) {
+    if (ry + 14 > BLOCK_TOP + BLOCK_H - 60) break;
+    drawWhiteBullet(doc, rightX + padX, ry, b, RIGHT_W - padX * 2);
+    ry += 16;
   }
 
-  // Precio en el fondo del bloque
-  const priceLines = priceBlockText(p, op.kind);
-  const priceBlockY = BLOCK_TOP + BLOCK_H - 92;
-  let py = priceBlockY;
-  doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
-    .text(priceLines[0], rightX + 14, py, { width: RIGHT_W - 28, lineBreak: false });
-  py += 24;
-  doc.font('Helvetica-Bold').fontSize(26).fillColor('#ffffff')
-    .text(priceLines[1], rightX + 14, py, { width: RIGHT_W - 28, lineBreak: false, ellipsis: true });
-  py += 30;
-  if (priceLines[2]) {
-    doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff')
-      .text(priceLines[2], rightX + 14, py, { width: RIGHT_W - 28, lineBreak: false });
+  // Precio destacado en el fondo del bloque (sin repetir "VENTA"/"RENTA")
+  const priceText = priceMain(p);
+  const priceSuffix = op.kind === 'renta' ? '/ mes' : '';
+  const priceY = BLOCK_TOP + BLOCK_H - 56;
+  doc.font('Helvetica-Bold').fontSize(24).fillColor('#ffffff')
+    .text(priceText, rightX + padX, priceY, {
+      width: RIGHT_W - padX * 2, lineBreak: false, ellipsis: true,
+    });
+  if (priceSuffix) {
+    doc.font('Helvetica').fontSize(11).fillColor('#ffffff')
+      .text(priceSuffix, rightX + padX, priceY + 28, {
+        width: RIGHT_W - padX * 2, lineBreak: false,
+      });
   }
 
   // --- Columna izquierda (texto) ---
@@ -587,14 +571,14 @@ function drawPage2(ctx) {
   });
   ry += REQ_H + 8;
 
-  // Bloque 2: promo + precio
+  // Bloque 2: información + precio
   const op = operationLabel(p.tipo_operacion);
   const priceLines = priceBlockText(p, op.kind);
   const PRICE_H = 145;
   doc.rect(rightX, ry, RIGHT_W, PRICE_H).fill(primary);
-  doc.font('Helvetica').fontSize(11).fillColor('#ffffff')
-    .text('PROMO ESPECIAL', rightX, ry + 16, { width: RIGHT_W, align: 'center', lineBreak: false });
-  doc.text('ESTE MES', rightX, ry + 32, { width: RIGHT_W, align: 'center', lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
+    .text('INFORMACIÓN DE', rightX, ry + 16, { width: RIGHT_W, align: 'center', lineBreak: false });
+  doc.text('LA PROPIEDAD', rightX, ry + 32, { width: RIGHT_W, align: 'center', lineBreak: false });
   // Precio grande
   doc.font('Helvetica-Bold').fontSize(28).fillColor('#ffffff')
     .text(priceLines[1] || priceLines[0], rightX, ry + 62, { width: RIGHT_W, align: 'center', lineBreak: false });
@@ -678,20 +662,37 @@ function drawBullet(doc, x, y, text, width, color) {
     .text(text, x + 12, y, { width: width - 14, lineBreak: false, ellipsis: true });
 }
 
-/** Tagline corto a partir de descripción/etiqueta. */
-function makeTagline(p) {
-  if (p.etiqueta) {
-    const e = String(p.etiqueta).toLowerCase();
-    if (e.includes('destac')) return 'Propiedad destacada con excelente ubicación y amenidades.';
-    if (e.includes('oport')) return 'Excelente oportunidad de inversión con precio competitivo.';
-    if (e.includes('nuev')) return 'Recién publicada — sé el primero en conocerla.';
+/** Línea de precio destacada (sólo el monto, sin etiqueta). */
+function priceMain(p) {
+  if (p.precio_a_consultar) return 'A CONSULTAR';
+  const usd = p.precio_usd ? fmtPrice(p.precio_usd, 'USD') : '';
+  const mxn = p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
+  return mxn || usd || 'A CONSULTAR';
+}
+
+/** Viñetas fijas del bloque lateral según operación (4 ítems). */
+function lateralBullets(opKind) {
+  if (opKind === 'renta') {
+    return [
+      'Asesoría personalizada',
+      'Contrato seguro y claro',
+      'Requisitos accesibles',
+      'Acompañamiento durante tu estancia',
+    ];
   }
-  const d = String(p.descripcion || '').replace(/\s+/g, ' ').trim();
-  if (d.length < 30) return 'Ideal para quienes buscan una excelente opción con precio accesible y amenidades.';
-  // Primera oración corta
-  const firstSentence = d.split(/[.!?]\s/)[0];
-  if (firstSentence.length > 30 && firstSentence.length < 140) return firstSentence + '.';
-  return d.slice(0, 110).trim() + '…';
+  return [
+    'Asesoría personalizada',
+    'Documentación en regla',
+    'Crédito bancario aceptado',
+    'Acompañamiento en todo el proceso',
+  ];
+}
+
+/** Bullet blanco para el bloque lateral (texto blanco sobre fondo color marca). */
+function drawWhiteBullet(doc, x, y, text, width) {
+  doc.fillColor('#ffffff').circle(x + 3, y + 6, 2).fill();
+  doc.font('Helvetica').fontSize(9).fillColor('#ffffff')
+    .text(text, x + 12, y, { width: width - 14, lineBreak: false, ellipsis: true });
 }
 
 /** Lista de amenidades combinada: medidas + amenidades del campo. */
