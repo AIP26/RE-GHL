@@ -726,6 +726,251 @@
   }
 
   // -------------------------------------------------------------------
+  // TeamPage — Paso 8 (admin only)
+  // -------------------------------------------------------------------
+  function TeamPage({ ctx }) {
+    const [loading, setLoading] = useState(true);
+    const [agentes, setAgentes] = useState([]);
+    const [planInfo, setPlanInfo] = useState({ name: '', limit: null, activeCount: 0, canAdd: true });
+    const [editing, setEditing] = useState(null);
+
+    const reload = useCallback(async () => {
+      setLoading(true);
+      try {
+        const d = await api('/agent?team=1');
+        setAgentes(d.agentes || []);
+        setPlanInfo(d.plan || { name: '', limit: null, activeCount: 0, canAdd: true });
+      } catch (e) {
+        toast('No pude cargar el equipo: ' + (e.detail?.message || e.message), 'error');
+      } finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { reload(); }, [reload]);
+
+    const onToggleActive = async (a) => {
+      try {
+        await api('/agent/' + a.id, { method: 'PUT', body: { activo: !a.activo } });
+        toast(a.activo ? 'Agente desactivado' : 'Agente reactivado ✓', 'success');
+        await reload();
+      } catch (e) {
+        toast(e.detail?.message || 'Error al actualizar', 'error');
+      }
+    };
+
+    const planLabel = planInfo.limit == null
+      ? `${planInfo.activeCount} agente${planInfo.activeCount === 1 ? '' : 's'} activo${planInfo.activeCount === 1 ? '' : 's'} (ilimitado)`
+      : `${planInfo.activeCount} de ${planInfo.limit} agente${planInfo.limit === 1 ? '' : 's'} activos`;
+
+    return html`<${Fragment}>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Mi equipo</h1>
+          <p className="page-subtitle">Gestiona los agentes que pueden subir propiedades y aparecen en las páginas públicas.</p>
+        </div>
+        <button
+          data-testid="new-agent-btn"
+          className="btn btn-primary"
+          onClick=${() => setEditing({ rol: 'agente', activo: true })}
+          disabled=${!planInfo.canAdd}
+          title=${!planInfo.canAdd ? `Tu plan ${planInfo.name?.toUpperCase()} no permite más agentes` : ''}
+        >＋ Agregar agente</button>
+      </div>
+
+      <div className="card plan-bar" data-testid="plan-bar">
+        <div className="plan-bar-info">
+          <strong>Plan ${planInfo.name?.toUpperCase() || '—'}</strong>
+          <span>${planLabel}</span>
+        </div>
+        ${!planInfo.canAdd ? html`<span className="plan-bar-warn">Límite alcanzado — actualiza tu plan para agregar más</span>` : null}
+      </div>
+
+      ${loading ? html`<div className="card">Cargando equipo…</div>` : (
+        agentes.length === 0 ? html`
+          <div className="card">
+            <div className="empty-state">
+              <h3>Aún no tienes miembros</h3>
+              <p>Agrega al primer integrante de tu equipo para asignarle propiedades.</p>
+            </div>
+          </div>
+        ` : html`
+          <div className="team-grid">
+            ${agentes.map((a) => html`<div key=${a.id} className=${'agent-card' + (a.activo ? '' : ' inactive')} data-testid=${'agent-card-' + a.id}>
+              <div className="agent-card-photo">
+                ${a.foto_url
+                  ? html`<img src=${a.foto_url} alt=${a.nombre} />`
+                  : html`<div className="agent-card-photo-placeholder">${(a.nombre || '?').charAt(0).toUpperCase()}</div>`}
+                ${a.activo ? null : html`<span className="agent-badge-inactive">Inactivo</span>`}
+              </div>
+              <div className="agent-card-body">
+                <div className="agent-card-name">${a.nombre}</div>
+                <div className=${'agent-card-role ' + a.rol}>${a.rol === 'admin' ? 'Administrador' : 'Agente'}</div>
+                <div className="agent-card-meta">
+                  ${a.email ? html`<div>${a.email}</div>` : null}
+                  ${a.telefono ? html`<div>${a.telefono}</div>` : null}
+                </div>
+                <div className="agent-card-stats">
+                  <span><strong>${a.propiedades_count}</strong> propiedad${a.propiedades_count === 1 ? '' : 'es'}</span>
+                  ${a.pending_ghl ? html`<span className="agent-badge-pending" title="Este agente aún no se ha conectado vía GHL — el ghl_user_id es temporal.">Pendiente GHL</span>` : null}
+                </div>
+                <div className="agent-card-actions">
+                  <button data-testid=${'edit-agent-' + a.id} className="btn btn-ghost" onClick=${() => setEditing({ ...a })}>Editar</button>
+                  <button data-testid=${'toggle-agent-' + a.id} className=${'btn ' + (a.activo ? 'btn-ghost danger' : 'btn-ghost')} onClick=${() => onToggleActive(a)}>${a.activo ? 'Desactivar' : 'Reactivar'}</button>
+                </div>
+              </div>
+            </div>`)}
+          </div>
+        `
+      )}
+
+      ${editing ? html`<${AgentModal}
+        initial=${editing}
+        planInfo=${planInfo}
+        onClose=${() => setEditing(null)}
+        onSaved=${async () => { await reload(); setEditing(null); }}
+      />` : null}
+    <//>`;
+  }
+
+  // Modal crear/editar agente
+  function AgentModal({ initial, planInfo, onClose, onSaved }) {
+    const isEdit = !!initial.id;
+    const [nombre, setNombre] = useState(initial.nombre || '');
+    const [email, setEmail] = useState(initial.email || '');
+    const [telefono, setTelefono] = useState(initial.telefono || '');
+    const [whatsapp, setWhatsapp] = useState(initial.whatsapp || '');
+    const [fotoUrl, setFotoUrl] = useState(initial.foto_url || '');
+    const [rol, setRol] = useState(initial.rol || 'agente');
+    const [activo, setActivo] = useState(initial.activo !== false);
+    const [ghlUserId, setGhlUserId] = useState(
+      initial.ghl_user_id && !initial.ghl_user_id.startsWith('pending:') ? initial.ghl_user_id : ''
+    );
+    const [uploading, setUploading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const onUpload = async (file) => {
+      if (!file) return;
+      setUploading(true);
+      try {
+        const sign = await api('/upload/sign', { method: 'POST', body: { kind: 'brand' } });
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('api_key', sign.apiKey);
+        fd.append('timestamp', sign.timestamp);
+        fd.append('folder', sign.folder);
+        fd.append('eager', sign.eager);
+        fd.append('signature', sign.signature);
+        const r = await fetch(sign.uploadUrl, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('upload_failed');
+        const j = await r.json();
+        const url = j.eager?.[0]?.secure_url || j.secure_url;
+        setFotoUrl(url);
+      } catch (e) {
+        toast('Error subiendo foto: ' + (e.message || e), 'error');
+      } finally { setUploading(false); }
+    };
+
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      if (!nombre.trim()) { toast('Falta el nombre', 'error'); return; }
+      setSaving(true);
+      try {
+        const payload = {
+          nombre: nombre.trim(),
+          email: email.trim() || null,
+          telefono: telefono.trim() || null,
+          whatsapp: whatsapp.trim() || null,
+          foto_url: fotoUrl || null,
+          rol,
+          activo,
+        };
+        if (ghlUserId.trim()) payload.ghl_user_id = ghlUserId.trim();
+        if (isEdit) {
+          await api('/agent/' + initial.id, { method: 'PUT', body: payload });
+          toast('Agente actualizado ✓', 'success');
+        } else {
+          await api('/agent', { method: 'POST', body: payload });
+          toast('Agente agregado ✓', 'success');
+        }
+        await onSaved();
+      } catch (err) {
+        const msg = err.detail?.message || err.message;
+        toast(msg, 'error');
+      } finally { setSaving(false); }
+    };
+
+    return html`<div className="modal-backdrop" onClick=${onClose}>
+      <div className="modal" onClick=${(e) => e.stopPropagation()} data-testid="agent-modal">
+        <div className="modal-header">
+          <h2>${isEdit ? 'Editar agente' : 'Agregar agente'}</h2>
+          <button className="modal-close" onClick=${onClose}>×</button>
+        </div>
+        <form onSubmit=${onSubmit} className="modal-body">
+          <div className="agent-form-grid">
+            <div className="form-field full">
+              <label className="form-label">Foto</label>
+              <div className="coll-photo-uploader">
+                ${fotoUrl ? html`<div className="agent-photo-preview">
+                  <img src=${fotoUrl} alt="" />
+                  <button type="button" className="rm" onClick=${() => setFotoUrl('')}>×</button>
+                </div>` : null}
+                <label className="photo-uploader" style=${{ width: fotoUrl ? '120px' : '100%' }}>
+                  <input type="file" accept="image/*" onChange=${(e) => onUpload(e.target.files[0])} />
+                  <div>${uploading ? 'Subiendo…' : (fotoUrl ? '↺ Reemplazar' : '＋ Subir foto')}</div>
+                </label>
+              </div>
+            </div>
+            <div className="form-field full">
+              <label className="form-label">Nombre <span className="req">*</span></label>
+              <input data-testid="agent-name" className="form-input" value=${nombre} onInput=${(e) => setNombre(e.target.value)} autoFocus />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Email</label>
+              <input data-testid="agent-email" className="form-input" type="email" value=${email} onInput=${(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Teléfono</label>
+              <input data-testid="agent-phone" className="form-input" value=${telefono} onInput=${(e) => setTelefono(e.target.value)} placeholder="+52 998 ..." />
+            </div>
+            <div className="form-field">
+              <label className="form-label">WhatsApp</label>
+              <input data-testid="agent-whatsapp" className="form-input" value=${whatsapp} onInput=${(e) => setWhatsapp(e.target.value)} placeholder="+52 998 ..." />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Rol</label>
+              <select data-testid="agent-role" className="form-input" value=${rol} onChange=${(e) => setRol(e.target.value)}>
+                <option value="agente">Agente</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <div className="form-field full">
+              <label className="form-label">GHL User ID (opcional)</label>
+              <input
+                data-testid="agent-ghl-id"
+                className="form-input"
+                value=${ghlUserId}
+                onInput=${(e) => setGhlUserId(e.target.value)}
+                placeholder="pyr7tK7t6wBZMpsL5pFJ"
+              />
+              <span className="form-help">Déjalo en blanco y el sistema lo vinculará automáticamente cuando el agente entre por primera vez desde GHL.</span>
+            </div>
+            ${isEdit ? html`<div className="form-field full">
+              <label className="form-toggle">
+                <input type="checkbox" checked=${activo} onChange=${(e) => setActivo(e.target.checked)} />
+                <span>Agente activo (aparece en dropdown de propiedades y página pública)</span>
+              </label>
+            </div>` : null}
+          </div>
+
+          <div className="action-bar" style=${{ position: 'static', margin: '12px -24px -20px' }}>
+            <button type="button" className="btn btn-ghost" onClick=${onClose} disabled=${saving}>Cancelar</button>
+            <button type="submit" data-testid="agent-save-btn" className="btn btn-primary" disabled=${saving || uploading}>${saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Agregar agente')}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
+
+  // -------------------------------------------------------------------
   // App root
   // -------------------------------------------------------------------
   function App() {
@@ -764,7 +1009,7 @@
       case 'new': body = html`<${NewPropertyPage} ctx=${ctx} />`; break;
       case 'listings': body = html`<${Placeholder} title="Mis listings" subtitle="La tabla con búsqueda y filtros está lista para construirse sobre /api/property." />`; break;
       case 'collections': body = html`<${CollectionsPage} ctx=${ctx} />`; break;
-      case 'team': body = html`<${Placeholder} title="Mi equipo" subtitle="Gestión de agentes con límites por plan. /api/agent ya devuelve la lista." />`; break;
+      case 'team': body = html`<${TeamPage} ctx=${ctx} />`; break;
       case 'settings': body = html`<${Placeholder} title="Configuración" subtitle="Marca, dominio y widget de contacto. Próxima iteración." />`; break;
       default: body = null;
     }
