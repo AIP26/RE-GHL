@@ -9,7 +9,7 @@ import {
   updateObjectRecord,
   getObjectRecord,
 } from '../lib/ghl.js';
-import { getFieldIds, toGhlFieldId } from '../lib/field-ids.js';
+import { getFieldIds, toGhlPropertyKey } from '../lib/field-ids.js';
 import { getSupabase } from '../lib/supabase.js';
 
 const r = Router();
@@ -33,25 +33,26 @@ r.post('/', requireSession, async (req, res) => {
     body.fecha_publicacion = new Date().toISOString().slice(0, 10);
     if (!body.agente_responsable) body.agente_responsable = req.agente.ghl_user_id;
 
-    // Map: shortKey -> field ID interno de GHL (NO fieldKey).
-    // La Custom Object Records API espera el ID del campo como key dentro
-    // de `properties`. El campo primario (titulo) también va aquí.
+    // Map: shortKey del body -> property key que GHL acepta.
+    // Confirmado vía probe contra la API real: la API de Custom Object
+    // Records espera el SUFIJO CORTO del fieldKey (ej. "titulo"), NO el
+    // fieldKey largo ("custom_objects.propiedad.titulo") ni el field id.
+    // El campo primario (titulo) va DENTRO de properties como cualquier otro.
     const properties = {};
     const skipped = [];
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue; // meta-fields (ej. _collections)
-      const fieldId = toGhlFieldId(shortKey);
-      if (!fieldId) {
+      const propKey = toGhlPropertyKey(shortKey);
+      if (!propKey) {
         skipped.push(shortKey);
         continue;
       }
       if (value === '' || value == null) continue;
-      properties[fieldId] = value;
+      properties[propKey] = value;
     }
 
     const ghlPayload = {
       locationId: req.tenant.ghl_location_id,
-      objectSchemaId: fieldIds.schemaId, // requerido por GHL al crear records
       properties,
     };
 
@@ -62,7 +63,6 @@ r.post('/', requireSession, async (req, res) => {
         tenant: req.tenant.id,
         locationId: req.tenant.ghl_location_id,
         objectKey: fieldIds.objectKey,
-        objectSchemaId: fieldIds.schemaId,
         bodyShortKeys: Object.keys(body),
         skippedUnknownKeys: skipped,
         propertiesCount: Object.keys(properties).length,
@@ -230,14 +230,13 @@ r.put('/:id', requireSession, async (req, res) => {
     const properties = {};
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue;
-      const fieldId = toGhlFieldId(shortKey);
-      if (!fieldId) continue;
-      properties[fieldId] = value;
+      const propKey = toGhlPropertyKey(shortKey);
+      if (!propKey) continue;
+      properties[propKey] = value;
     }
 
     const ghlPayload = {
       locationId: req.tenant.ghl_location_id,
-      objectSchemaId: fieldIds.schemaId,
       properties,
     };
 
@@ -246,7 +245,6 @@ r.put('/:id', requireSession, async (req, res) => {
       JSON.stringify({
         recordId: req.params.id,
         objectKey: fieldIds.objectKey,
-        objectSchemaId: fieldIds.schemaId,
         propertiesCount: Object.keys(properties).length,
         properties,
       })

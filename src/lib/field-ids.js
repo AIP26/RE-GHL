@@ -39,9 +39,18 @@ export function toGhlFieldKey(shortKey) {
 }
 
 /** Resuelve un valor del form (clave corta) al field ID interno de GHL.
- *  Es lo que la API de Custom Object Records espera como key dentro
- *  del objeto `properties` al hacer POST/PUT. */
+ *  Útil si en el futuro algún endpoint lo pide explícitamente. */
 export function toGhlFieldId(shortKey) {
   const f = getFieldIds().fields[shortKey];
   return f?.id || null;
+}
+
+/** Devuelve la "property key" que GHL espera dentro del objeto `properties`
+ *  al crear o actualizar un Custom Object Record. Confirmado vía probe:
+ *  GHL espera el SUFIJO CORTO del fieldKey (ej. "titulo", "precio_usd"),
+ *  NO el fieldKey largo ni el id interno. Devuelve null si el shortKey
+ *  no existe en ghl-field-ids.json. */
+export function toGhlPropertyKey(shortKey) {
+  const f = getFieldIds().fields[shortKey];
+  return f ? shortKey : null;
 }
