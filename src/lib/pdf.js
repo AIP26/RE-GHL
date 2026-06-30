@@ -309,16 +309,21 @@ function drawPage1(ctx) {
   doc.opacity(1); // garantizar reset por si el branch del catch dejó algo abierto
 
   // Logo overlay top-right (solo con-agente) — 100% opacidad, sobre la foto atenuada.
-  // Importante: NO usar fondo de color, el PNG ya tiene transparencia gracias a asPng().
+  // Capas: foto hero (0.6 opacity) → rectángulo sólido color marca → logo PNG (100%).
+  // El rectángulo enmarca al logo para destacarlo sobre la foto.
   if (withAgent && logoBuf) {
-    const LOGO_W = 140;
-    const LOGO_H = 75;
+    const LOGO_W = 130;
+    const LOGO_H = 70;
+    const PAD = 10;
     const lx = x + CONTENT_WIDTH - LOGO_W - 14;
     const ly = y + 14;
     doc.save();
     doc.opacity(1);
+    // Rectángulo de fondo (color marca sólido)
+    doc.rect(lx - PAD, ly - PAD, LOGO_W + PAD * 2, LOGO_H + PAD * 2).fill(primary);
+    // Logo encima con transparencia PNG intacta
     try {
-      doc.image(logoBuf, lx, ly, { fit: [LOGO_W, LOGO_H], align: 'right', valign: 'top' });
+      doc.image(logoBuf, lx, ly, { fit: [LOGO_W, LOGO_H], align: 'center', valign: 'center' });
     } catch (e) { /* skip */ }
     doc.restore();
   }
@@ -557,19 +562,39 @@ function drawPage2(ctx) {
   const rightX = x + LEFT_W + 14;
   let ry = y;
 
-  // Bloque 1: requisitos
-  const reqs = buildRequisitos(p);
-  const REQ_H = 14 + reqs.length * 18 + 14;
-  doc.rect(rightX, ry, RIGHT_W, REQ_H).fill(primary);
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#ffffff');
-  reqs.forEach((r, i) => {
-    const by = ry + 14 + i * 18;
-    doc.circle(rightX + 16, by + 5, 2).fill('#ffffff');
-    doc.fillColor('#ffffff').text(r.toUpperCase(), rightX + 26, by, {
-      width: RIGHT_W - 36, lineBreak: false, ellipsis: true,
+  // Bloque 1: requisitos (con-agente) o CTA orgánico (sin-agente)
+  if (withAgent) {
+    const reqs = buildRequisitos(p);
+    const REQ_H = 14 + reqs.length * 18 + 14;
+    doc.rect(rightX, ry, RIGHT_W, REQ_H).fill(primary);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#ffffff');
+    reqs.forEach((r, i) => {
+      const by = ry + 14 + i * 18;
+      doc.circle(rightX + 16, by + 5, 2).fill('#ffffff');
+      doc.fillColor('#ffffff').text(r.toUpperCase(), rightX + 26, by, {
+        width: RIGHT_W - 36, lineBreak: false, ellipsis: true,
+      });
     });
-  });
-  ry += REQ_H + 8;
+    ry += REQ_H + 8;
+  } else {
+    // Versión orgánica: CTA invitando a contactar a un asesor
+    const CTA_H = 150;
+    doc.rect(rightX, ry, RIGHT_W, CTA_H).fill(primary);
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff')
+      .text('¿Te interesa', rightX + 16, ry + 22, {
+        width: RIGHT_W - 32, align: 'left', lineBreak: false,
+      });
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff')
+      .text('esta propiedad?', rightX + 16, ry + 40, {
+        width: RIGHT_W - 32, align: 'left', lineBreak: false,
+      });
+    doc.font('Helvetica').fontSize(10.5).fillColor('#ffffff')
+      .text('Contacta a tu asesor inmobiliario para agendar una visita o resolver tus dudas.',
+        rightX + 16, ry + 74, {
+          width: RIGHT_W - 32, lineGap: 3, align: 'left',
+        });
+    ry += CTA_H + 8;
+  }
 
   // Bloque 2: información + precio
   const op = operationLabel(p.tipo_operacion);
@@ -775,7 +800,6 @@ function drawContactBlock(ctx, x, y, w, h) {
     lines.push({ icon: 'ig', text: handle ? '@' + handle : ig });
   }
   if (brand?.email) lines.push({ icon: 'em', text: brand.email });
-  if (brand?.subdominio) lines.push({ icon: 'web', text: brand.subdominio });
   if (agent?.telefono || brand?.telefono) lines.push({ icon: 'tel', text: formatPhone(agent?.telefono || brand.telefono) });
   if (agent?.whatsapp || brand?.whatsapp) lines.push({ icon: 'wa', text: formatPhone(agent?.whatsapp || brand.whatsapp) });
 
