@@ -70,7 +70,7 @@ r.get('/', async (req, res, next) => {
       `<section class="hero">
         ${hero ? `<img class="hero-bg" src="${esc(hero)}" alt="" />` : ''}
         <div class="container hero-content">
-          ${brand?.logo_url ? `<img src="${esc(brand.logo_url)}" alt="${esc(brand.nombre_agencia || '')}" style="height:48px;margin-bottom:24px;background:rgba(255,255,255,.95);padding:6px 10px;border-radius:8px" />` : ''}
+          ${brand?.logo_url ? `<img src="${esc(brand.logo_url)}" alt="${esc(brand.nombre_agencia || '')}" style="height:56px;width:auto;margin-bottom:24px;display:block" />` : ''}
           <h1>${esc(brand?.nombre_agencia || 'Encuentra tu próxima propiedad')}</h1>
           <p>Casas, departamentos y oportunidades — listas para vivir o invertir.</p>
           <form class="search-box" method="GET" action="/buscar">

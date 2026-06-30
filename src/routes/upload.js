@@ -40,8 +40,13 @@ r.post('/sign', requireSession, (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
 
   // Eager: para fotos de propiedad → WebP <=2000px q=80 (Master Context).
-  // Para otras categorías de marca → f_auto,q_auto (formato óptimo por navegador).
-  const eager = kind === 'property' ? 'f_webp,q_80,w_2000,c_limit' : 'f_auto,q_auto';
+  // Para otras categorías de marca → f_auto,c_limit,w_1200 SIN q_auto.
+  // `q_auto` puede stripear el canal alpha al elegir compresión lossy en
+  // imágenes con transparencia. f_auto solo + c_limit garantiza que un PNG
+  // transparente conserve la transparencia al servirse como WebP/AVIF.
+  const eager = kind === 'property'
+    ? 'f_webp,q_80,w_2000,c_limit'
+    : 'f_auto,c_limit,w_1200';
 
   // Build the string to sign: parámetros en orden alfabético, "k=v&k=v" + api_secret
   const params = { eager, folder, timestamp: String(timestamp) };
