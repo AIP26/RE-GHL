@@ -57,6 +57,23 @@ async function main() {
     console.log('OK ·', (stats.size / 1024).toFixed(1) + ' KB');
   }
 
+  // Variante extra: forzar tipo_operacion='renta' para verificar las viñetas de renta.
+  // Sólo genera con-agente-2pag (que es la versión donde aparece el bloque de viñetas).
+  process.stdout.write('  · generando con-agente-2pag-RENTA-test… ');
+  const rentaRecord = JSON.parse(JSON.stringify(record));
+  rentaRecord.properties.tipo_operacion = 'renta';
+  const rentaDoc = await buildPropertyPDF({
+    record: rentaRecord, brand, agent,
+    withAgent: true, twoPages: true,
+    baseUrl: `https://${brand?.subdominio || 'preview.mktscaled.com'}`,
+  });
+  const rentaPath = path.join(OUT_DIR, 'con-agente-2pag-RENTA-test.pdf');
+  const rws = fs.createWriteStream(rentaPath);
+  rentaDoc.pipe(rws);
+  rentaDoc.end();
+  await new Promise((res, rej) => { rws.on('finish', res); rws.on('error', rej); });
+  console.log('OK ·', (fs.statSync(rentaPath).size / 1024).toFixed(1) + ' KB');
+
   console.log('\nlisto: ls -la', OUT_DIR);
 }
 

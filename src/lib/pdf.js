@@ -737,30 +737,23 @@ function buildAmenitiesList(p) {
   return out;
 }
 
-/** Lista de requisitos para el bloque derecho de página 2.
- *  Si el cliente la cargó en `requisitos` la usamos; si no, default razonable. */
+/** Lista de viñetas para el bloque superior derecho de página 2 (con-agente).
+ *  Copy fijo aprobado por cliente, depende de `tipo_operacion`. */
 function buildRequisitos(p) {
-  if (p.requisitos && typeof p.requisitos === 'string') {
-    return p.requisitos.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 7);
-  }
-  const op = String(p.tipo_operacion || '').toLowerCase();
+  const op = String(p?.tipo_operacion || '').toLowerCase();
   if (op === 'renta') {
     return [
-      'Renta largo plazo',
-      'Requisitos',
-      '1 mes de renta',
-      '1 depósito',
-      'Estudio socioeconómico',
-      'Mascotas bienvenidas',
+      'Asesoría personalizada',
+      'Requisitos accesibles',
+      'Proceso transparente',
+      'Atención durante todo el proceso',
     ];
   }
   return [
-    'Trato directo',
-    'Escrituras al corriente',
-    'Libre de gravamen',
+    'Asesoría personalizada',
+    'Documentación en regla',
     'Crédito bancario aceptado',
-    'Infonavit / Fovissste',
-    'Cita previa',
+    'Atención durante todo el proceso',
   ];
 }
 
