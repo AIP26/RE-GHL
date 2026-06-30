@@ -1412,6 +1412,290 @@
   }
 
   // -------------------------------------------------------------------
+  // ListingsPage — Paso 13 (Mis listings + URL orgánica)
+  // -------------------------------------------------------------------
+  function ListingsPage({ ctx }) {
+    const [loading, setLoading] = useState(true);
+    const [records, setRecords] = useState([]);
+    const [viewCounts, setViewCounts] = useState({});
+    const [filters, setFilters] = useState({ q: '', coleccion: '', estado: '', tipo: '', precio_min: '', precio_max: '', agente: '' });
+    const [page, setLocalPage] = useState(1);
+    const [openMenuId, setOpenMenuId] = useState(null);
+    const [shareTarget, setShareTarget] = useState(null);
+    const PAGE_SIZE = 20;
+    const isAdmin = ctx.session?.agente?.rol === 'admin'; // may be undefined; show always
+
+    const reload = useCallback(async () => {
+      setLoading(true);
+      try {
+        const d = await api('/property?limit=100');
+        const recs = d.records || d.data || [];
+        setRecords(recs);
+        if (recs.length) {
+          const ids = recs.map((r) => r.id).join(',');
+          const v = await api('/analytics/views?ids=' + encodeURIComponent(ids));
+          setViewCounts(v.counts || {});
+        }
+      } catch (e) {
+        toast('Error cargando propiedades: ' + (e.detail?.message || e.message), 'error');
+      } finally { setLoading(false); }
+    }, []);
+    useEffect(() => { reload(); }, [reload]);
+
+    useEffect(() => {
+      const onDoc = () => setOpenMenuId(null);
+      document.addEventListener('click', onDoc);
+      return () => document.removeEventListener('click', onDoc);
+    }, []);
+
+    // Filtrado client-side
+    const filtered = (records || []).filter((r) => {
+      const p = r.properties || {};
+      if (filters.q) {
+        const text = [p.titulo, p.direccion_completa, p.colonia, p.ciudad].join(' ').toLowerCase();
+        if (!text.includes(filters.q.toLowerCase())) return false;
+      }
+      if (filters.estado && (p.estado || '').toLowerCase() !== filters.estado.toLowerCase()) return false;
+      if (filters.tipo && (p.tipo_inmueble || '').toLowerCase() !== filters.tipo.toLowerCase()) return false;
+      if (filters.precio_min && Number(p.precio_usd || 0) < Number(filters.precio_min)) return false;
+      if (filters.precio_max && Number(p.precio_usd || 0) > Number(filters.precio_max)) return false;
+      if (filters.agente && p.agente_responsable !== filters.agente) return false;
+      // colecciones: no tenemos en el record desde GHL — para Fase 1 lo omitimos del filtro
+      return true;
+    });
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const pageRecords = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    const agentByUserId = {};
+    for (const a of ctx.agentes || []) agentByUserId[a.ghl_user_id] = a;
+
+    const changeEstado = async (rec, nuevo) => {
+      try {
+        await api('/property/' + rec.id, { method: 'PUT', body: { estado: nuevo } });
+        toast(`Estado: ${nuevo} ✓`, 'success');
+        await reload();
+      } catch (e) { toast(e.detail?.message || e.message, 'error'); }
+    };
+
+    const onDelete = async (rec) => {
+      if (!confirm(`Eliminar definitivamente "${rec.properties?.titulo || 'propiedad'}"?`)) return;
+      try {
+        await api('/property/' + rec.id, { method: 'DELETE' });
+        toast('Propiedad eliminada', 'success');
+        await reload();
+      } catch (e) { toast(e.detail?.message || e.message, 'error'); }
+    };
+
+    const portalHost = ctx.portal?.subdominio || `localhost:8001/?preview=${ctx.tenant.id}`;
+    const portalBase = ctx.portal?.activo ? `https://${ctx.portal.subdominio}` : `http://${portalHost}`;
+
+    return html`<${Fragment}>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Mis listings</h1>
+          <p className="page-subtitle">${filtered.length} propiedad${filtered.length === 1 ? '' : 'es'} · ${records.length} en total</p>
+        </div>
+      </div>
+
+      <div className="listings-filters card">
+        <input data-testid="listings-q" className="form-input" placeholder="Buscar por título o dirección" value=${filters.q} onInput=${(e) => { setFilters({ ...filters, q: e.target.value }); setLocalPage(1); }} />
+        <select className="form-input" value=${filters.estado} onChange=${(e) => setFilters({ ...filters, estado: e.target.value })}>
+          <option value="">Todos los estados</option>
+          <option value="Disponible">Disponible</option>
+          <option value="Vendida">Vendida</option>
+          <option value="Rentada">Rentada</option>
+          <option value="Pausada">Pausada</option>
+        </select>
+        <select className="form-input" value=${filters.tipo} onChange=${(e) => setFilters({ ...filters, tipo: e.target.value })}>
+          <option value="">Todos los tipos</option>
+          ${['Casa', 'Departamento', 'Local', 'Terreno', 'Oficina', 'Villa', 'Penthouse'].map((t) => html`<option key=${t} value=${t}>${t}</option>`)}
+        </select>
+        <input type="number" className="form-input" placeholder="Precio mín USD" value=${filters.precio_min} onInput=${(e) => setFilters({ ...filters, precio_min: e.target.value })} />
+        <input type="number" className="form-input" placeholder="Precio máx USD" value=${filters.precio_max} onInput=${(e) => setFilters({ ...filters, precio_max: e.target.value })} />
+        ${isAdmin ? html`<select className="form-input" value=${filters.agente} onChange=${(e) => setFilters({ ...filters, agente: e.target.value })}>
+          <option value="">Todos los agentes</option>
+          ${(ctx.agentes || []).map((a) => html`<option key=${a.ghl_user_id} value=${a.ghl_user_id}>${a.nombre}</option>`)}
+        </select>` : null}
+      </div>
+
+      ${loading ? html`<div className="card">Cargando…</div>` :
+        pageRecords.length === 0 ? html`<div className="card"><div className="empty-state"><h3>Sin resultados</h3><p>Prueba ajustar los filtros o crear una nueva propiedad.</p></div></div>` :
+        html`<div className="listings-table-wrap card" style=${{ padding: 0, overflow: 'auto' }}>
+          <table className="listings-table" data-testid="listings-table">
+            <thead><tr>
+              <th></th>
+              <th>Título</th>
+              <th>Precio USD</th>
+              <th>Estado</th>
+              <th>Vistas</th>
+              <th>Agente</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              ${pageRecords.map((rec) => {
+                const p = rec.properties || {};
+                const photos = String(p.fotos_urls || '').split('|').filter(Boolean);
+                const photo = photos[0] || null;
+                const agt = agentByUserId[p.agente_responsable];
+                const estado = p.estado || 'Disponible';
+                const slug = p.slug_url || rec.id;
+                return html`<tr key=${rec.id} data-testid=${'listing-row-' + rec.id}>
+                  <td className="thumb">
+                    ${photo ? html`<img src=${photo} alt="" />` : html`<div className="thumb-ph"></div>`}
+                  </td>
+                  <td>
+                    <div className="listing-title">${p.titulo || 'Sin título'}</div>
+                    <div className="listing-loc">${[p.colonia, p.ciudad].filter(Boolean).join(', ')}</div>
+                  </td>
+                  <td className="listing-price">${p.precio_a_consultar ? 'A consultar' : ('$' + Number(p.precio_usd || 0).toLocaleString())}</td>
+                  <td><span className=${'estado-badge estado-' + estado.toLowerCase()}>${estado}</span></td>
+                  <td className="listing-views">${viewCounts[rec.id] || 0}</td>
+                  <td>${agt?.nombre || '—'}</td>
+                  <td className="listing-actions">
+                    <button data-testid=${'listing-menu-' + rec.id} className="ico-btn" onClick=${(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === rec.id ? null : rec.id); }}>···</button>
+                    ${openMenuId === rec.id ? html`<div className="row-menu" onClick=${(e) => e.stopPropagation()}>
+                      <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener">Ver propiedad</a>
+                      <button onClick=${() => { setOpenMenuId(null); setShareTarget(rec); }} data-testid=${'share-btn-' + rec.id}>URL orgánica</button>
+                      <div className="row-menu-sep">PDF</div>
+                      <a href=${'/p/' + slug + '/pdf?v=con-agente-1pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Con datos · 1 pág</a>
+                      <a href=${'/p/' + slug + '/pdf?v=con-agente-2pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Con datos · 2 págs</a>
+                      <a href=${'/p/' + slug + '/pdf?v=sin-agente-1pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Orgánico · 1 pág</a>
+                      <a href=${'/p/' + slug + '/pdf?v=sin-agente-2pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Orgánico · 2 págs</a>
+                      <div className="row-menu-sep">Cambiar estado</div>
+                      ${estado !== 'Disponible' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Disponible'); }}>Publicar (Disponible)</button>` : null}
+                      ${estado !== 'Pausada' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Pausada'); }}>Pausar</button>` : null}
+                      ${estado !== 'Vendida' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Vendida'); }}>Marcar vendida</button>` : null}
+                      ${estado !== 'Rentada' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Rentada'); }}>Marcar rentada</button>` : null}
+                      <div className="row-menu-sep"></div>
+                      <button className="danger" onClick=${() => { setOpenMenuId(null); onDelete(rec); }}>Eliminar</button>
+                    </div>` : null}
+                  </td>
+                </tr>`;
+              })}
+            </tbody>
+          </table>
+        </div>`}
+
+      ${totalPages > 1 ? html`<div className="pagination" data-testid="listings-pagination">
+        <button disabled=${page === 1} onClick=${() => setLocalPage(page - 1)}>‹ Anterior</button>
+        <span>Página ${page} de ${totalPages}</span>
+        <button disabled=${page === totalPages} onClick=${() => setLocalPage(page + 1)}>Siguiente ›</button>
+      </div>` : null}
+
+      ${shareTarget ? html`<${ShareModal}
+        ctx=${ctx}
+        property=${shareTarget}
+        onClose=${() => setShareTarget(null)}
+      />` : null}
+    <//>`;
+  }
+
+  // Modal URL orgánica
+  function ShareModal({ ctx, property, onClose }) {
+    const [loading, setLoading] = useState(true);
+    const [ficha, setFicha] = useState(null);
+    const [cnameTarget, setCnameTarget] = useState('');
+    const [expiraEn, setExpiraEn] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const reload = useCallback(async () => {
+      setLoading(true);
+      try {
+        const d = await api('/share/' + property.id);
+        setFicha(d.ficha);
+        setCnameTarget(d.cname_target);
+        setExpiraEn(d.ficha?.expira_en ? String(d.ficha.expira_en).slice(0, 10) : '');
+      } finally { setLoading(false); }
+    }, [property.id]);
+    useEffect(() => { reload(); }, [reload]);
+
+    const generate = async (regenerate = false) => {
+      setSaving(true);
+      try {
+        const d = await api('/share/' + property.id, { method: 'POST', body: { regenerate, expira_en: expiraEn || null } });
+        setFicha(d.ficha);
+        toast(regenerate ? 'URL regenerada — la anterior fue desactivada' : 'URL orgánica creada ✓', 'success');
+      } catch (e) { toast(e.detail?.message || e.message, 'error'); }
+      finally { setSaving(false); }
+    };
+
+    const updateField = async (fields) => {
+      if (!ficha) return;
+      setSaving(true);
+      try {
+        const d = await api('/share/by-id/' + ficha.id, { method: 'PUT', body: fields });
+        setFicha(d.ficha);
+        toast('Actualizado ✓', 'success');
+      } catch (e) { toast(e.detail?.message || e.message, 'error'); }
+      finally { setSaving(false); }
+    };
+
+    const copyUrl = async () => {
+      if (!ficha?.url) return;
+      try { await navigator.clipboard.writeText(ficha.url); toast('URL copiada ✓', 'success'); }
+      catch { toast('No pude copiar', 'error'); }
+    };
+
+    return html`<div className="modal-backdrop" onClick=${onClose}>
+      <div className="modal" onClick=${(e) => e.stopPropagation()} data-testid="share-modal" style=${{ maxWidth: '560px' }}>
+        <div className="modal-header">
+          <h2>URL orgánica</h2>
+          <button className="modal-close" onClick=${onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <p className="card-help" style=${{ margin: '0 0 14px' }}>
+            URL neutra para compartir con colegas — sin tu marca ni datos de contacto.
+            La página de destino expira o se desactiva a tu criterio.
+          </p>
+          ${loading ? html`<div>Cargando…</div>` : !ficha ? html`<div>
+            <div className="share-empty">
+              <p>Esta propiedad aún no tiene URL orgánica.</p>
+              <div className="form-field" style=${{ maxWidth: '220px' }}>
+                <label className="form-label">Expiración (opcional)</label>
+                <input type="date" className="form-input" value=${expiraEn} onInput=${(e) => setExpiraEn(e.target.value)} />
+              </div>
+              <button data-testid="generate-share-btn" className="btn btn-primary" onClick=${() => generate(false)} disabled=${saving}>${saving ? 'Generando…' : 'Generar URL orgánica'}</button>
+            </div>
+          </div>` : html`<${Fragment}>
+            <div className="share-url-box">
+              <div className="share-url-label">Tu URL orgánica</div>
+              <div className="share-url-row">
+                <code data-testid="share-url">${ficha.url}</code>
+                <button className="btn btn-ghost" onClick=${copyUrl}>Copiar</button>
+              </div>
+              <div className="share-stats">
+                <span><strong>${ficha.vistas}</strong> vista${ficha.vistas === 1 ? '' : 's'}</span>
+                <span className=${'estado-badge ' + (ficha.activa ? 'estado-disponible' : 'estado-pausada')}>${ficha.activa ? 'Activa' : 'Inactiva'}</span>
+              </div>
+            </div>
+
+            <div className="share-controls">
+              <div className="form-field">
+                <label className="form-label">Fecha de expiración (opcional)</label>
+                <input type="date" className="form-input" value=${expiraEn} onInput=${(e) => setExpiraEn(e.target.value)} onBlur=${() => updateField({ expira_en: expiraEn || null })} />
+                <span className="form-help">Tras esta fecha la página devolverá 404.</span>
+              </div>
+
+              <div className="form-field">
+                <label className="form-toggle">
+                  <input type="checkbox" checked=${ficha.activa} onChange=${(e) => updateField({ activa: e.target.checked })} />
+                  <span>URL activa (desactivar la deja inservible sin borrarla)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="share-actions">
+              <button className="btn btn-ghost danger" onClick=${() => { if (confirm('Esto generará una URL NUEVA y desactivará la anterior. ¿Continuar?')) generate(true); }} disabled=${saving}>Regenerar (cambia la URL)</button>
+              <a href=${ficha.portal_path} target="_blank" rel="noopener" className="btn btn-ghost">Vista previa</a>
+            </div>
+          <//>`}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // -------------------------------------------------------------------
   // App root
   // -------------------------------------------------------------------
   function App() {
@@ -1448,7 +1732,7 @@
     switch (page) {
       case 'dashboard': body = html`<${Dashboard} ctx=${ctx} />`; break;
       case 'new': body = html`<${NewPropertyPage} ctx=${ctx} />`; break;
-      case 'listings': body = html`<${Placeholder} title="Mis listings" subtitle="La tabla con búsqueda y filtros está lista para construirse sobre /api/property." />`; break;
+      case 'listings': body = html`<${ListingsPage} ctx=${ctx} setPage=${setPage} />`; break;
       case 'collections': body = html`<${CollectionsPage} ctx=${ctx} />`; break;
       case 'team': body = html`<${TeamPage} ctx=${ctx} />`; break;
       case 'settings': body = html`<${SettingsPage} ctx=${ctx} />`; break;

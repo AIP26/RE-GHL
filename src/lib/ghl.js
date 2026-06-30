@@ -254,6 +254,14 @@ export async function updateObjectRecord(accessToken, fullObjectKey, recordId, p
   return data?.record || data;
 }
 
+export async function deleteObjectRecord(accessToken, fullObjectKey, recordId, locationId) {
+  const { data } = await ghlClient(accessToken).delete(
+    `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`,
+    { params: { locationId } }
+  );
+  return data;
+}
+
 /** Búsqueda + paginación de records. */
 export async function listObjectRecords(accessToken, fullObjectKey, { locationId, limit = 20, offset = 0, query }) {
   const body = {

@@ -8,6 +8,7 @@ import {
   listObjectRecords,
   updateObjectRecord,
   getObjectRecord,
+  deleteObjectRecord,
 } from '../lib/ghl.js';
 import { getFieldIds, toGhlPropertyKey } from '../lib/field-ids.js';
 import { getSupabase } from '../lib/supabase.js';
@@ -307,6 +308,33 @@ r.put('/:id', requireSession, async (req, res) => {
       ghl_status: status,
       ghl_response: err?.response?.data,
       message: err?.message,
+    });
+  }
+});
+
+// ---------------------------------------------------------------------
+// DELETE /api/property/:id — borra el record en GHL + limpia Supabase
+// ---------------------------------------------------------------------
+r.delete('/:id', requireSession, async (req, res) => {
+  try {
+    const fieldIds = getFieldIds();
+    const t = await getTenantWithTokens(req.tenant.id);
+    await deleteObjectRecord(
+      t.access_token, fieldIds.objectKey, req.params.id, req.tenant.ghl_location_id
+    );
+    // Limpiamos relaciones locales (colecciones, fichas, page_views).
+    const sb = getSupabase();
+    await Promise.all([
+      sb.from('propiedades_colecciones').delete().eq('tenant_id', req.tenant.id).eq('propiedad_id', req.params.id),
+      sb.from('fichas_url').delete().eq('tenant_id', req.tenant.id).eq('property_id', req.params.id),
+      sb.from('page_views').delete().eq('tenant_id', req.tenant.id).eq('property_id', req.params.id),
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[property/delete]', err?.response?.data || err);
+    res.status(err.response?.status || 500).json({
+      error: 'ghl_delete_failed',
+      detail: err?.response?.data || err.message,
     });
   }
 });
