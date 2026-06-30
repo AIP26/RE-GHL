@@ -15,6 +15,17 @@ const r = Router();
 // Body opcional: { kind: 'property' | 'brand' | 'agent' | 'collection' }
 // Responde con todos los params necesarios para que el cliente POSTee a
 // https://api.cloudinary.com/v1_1/{cloudName}/image/upload
+// Mapping explícito kind del cliente -> nombre de carpeta en Cloudinary.
+// Master Context v2.6:
+//   /tenants/{tenant_id}/properties/  -> fotos de propiedades
+//   /tenants/{tenant_id}/brand/       -> logos, hero, asociaciones, fotos de agentes
+const FOLDER_BY_KIND = {
+  property: 'properties',
+  brand: 'brand',
+  agent: 'brand',       // fotos de agentes viven bajo brand según Master Context
+  collection: 'brand',  // misma carpeta
+};
+
 r.post('/sign', requireSession, (req, res) => {
   if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
     return res.status(500).json({
@@ -24,11 +35,12 @@ r.post('/sign', requireSession, (req, res) => {
   }
 
   const kind = (req.body?.kind || 'property').replace(/[^a-z]/g, '');
-  const folder = `tenants/${req.tenant.id}/${kind}`;
+  const subfolder = FOLDER_BY_KIND[kind] || 'brand';
+  const folder = `tenants/${req.tenant.id}/${subfolder}`;
   const timestamp = Math.floor(Date.now() / 1000);
 
-  // Eager transformations: para fotos de propiedad, generamos WebP <=2000px q=80.
-  // El cliente recibirá la URL WebP optimizada como variante "eager".
+  // Eager: para fotos de propiedad → WebP <=2000px q=80 (Master Context).
+  // Para otras categorías de marca → f_auto,q_auto (formato óptimo por navegador).
   const eager = kind === 'property' ? 'f_webp,q_80,w_2000,c_limit' : 'f_auto,q_auto';
 
   // Build the string to sign: parámetros en orden alfabético, "k=v&k=v" + api_secret
