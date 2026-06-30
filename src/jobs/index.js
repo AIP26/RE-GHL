@@ -3,6 +3,7 @@
 //  - Verificación CNAME pendientes cada 60s  (Paso 10 — stub)
 import cron from 'node-cron';
 import { refreshAllTenantTokens } from './refresh-tokens.js';
+import { verifyPendingCnames } from './cname-verify.js';
 
 let started = false;
 
@@ -23,8 +24,15 @@ export function startJobs() {
   });
 
   // ---- Verificación CNAME pendientes cada 60s (Paso 10) ----
-  cron.schedule('*/1 * * * *', () => {
-    // TODO Paso 10: dns.resolveCname para dominios con cname_verificado=false
+  // DNS lookup contra los dominios con cname_verificado=false. Marca como
+  // verificado cuando el CNAME resuelve correctamente a listings.{APP_DOMAIN}.
+  cron.schedule('*/1 * * * *', async () => {
+    try {
+      await verifyPendingCnames();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[cron:cname-verify] error:', err.message);
+    }
   });
 
   // eslint-disable-next-line no-console

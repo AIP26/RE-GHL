@@ -971,6 +971,154 @@
   }
 
   // -------------------------------------------------------------------
+  // SettingsPage — Paso 10 (Dominio) + más tabs en pasos siguientes
+  // -------------------------------------------------------------------
+  function SettingsPage({ ctx }) {
+    const [tab, setTab] = useState('domain');
+    const tabs = [
+      { id: 'domain', label: 'Dominio' },
+      { id: 'brand', label: 'Marca', disabled: true },
+      { id: 'widget', label: 'Widget de contacto', disabled: true },
+    ];
+    return html`<${Fragment}>
+      <div className="page-header"><div>
+        <h1 className="page-title">Configuración</h1>
+        <p className="page-subtitle">Ajusta tu dominio, marca y widget de contacto.</p>
+      </div></div>
+      <div className="settings-tabs">
+        ${tabs.map((t) => html`<button
+          key=${t.id}
+          className=${'settings-tab' + (tab === t.id ? ' active' : '')}
+          disabled=${t.disabled}
+          onClick=${() => !t.disabled && setTab(t.id)}
+        >${t.label}${t.disabled ? ' (próximamente)' : ''}</button>`)}
+      </div>
+      ${tab === 'domain' ? html`<${DomainTab} ctx=${ctx} />` : null}
+    <//>`;
+  }
+
+  function DomainTab({ ctx }) {
+    const [state, setState] = useState({ loading: true, dominio: null, cnameTarget: '', input: '' });
+    const [saving, setSaving] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [verifyResult, setVerifyResult] = useState(null);
+    const isAdmin = ctx.tenant && ctx.tenant.rol === 'admin'; // placeholder
+
+    const reload = useCallback(async () => {
+      const d = await api('/domain');
+      setState((s) => ({ ...s, loading: false, dominio: d.dominio, cnameTarget: d.cname_target, input: d.dominio?.subdominio || s.input }));
+    }, []);
+    useEffect(() => { reload(); }, [reload]);
+
+    const onSave = async (e) => {
+      e.preventDefault();
+      const host = (state.input || '').trim().toLowerCase();
+      if (!host) { toast('Ingresa un subdominio', 'error'); return; }
+      setSaving(true);
+      try {
+        const d = await api('/domain', { method: 'POST', body: { subdominio: host } });
+        setState((s) => ({ ...s, dominio: d.dominio }));
+        setVerifyResult(null);
+        toast('Subdominio guardado. Ahora agrega el CNAME en tu DNS.', 'success');
+      } catch (err) {
+        toast(err.detail?.message || err.message, 'error');
+      } finally { setSaving(false); }
+    };
+
+    const onVerify = async () => {
+      setVerifying(true);
+      setVerifyResult(null);
+      try {
+        const d = await api('/domain/verify', { method: 'POST' });
+        setVerifyResult(d);
+        setState((s) => ({ ...s, dominio: d.dominio }));
+        toast(d.ok ? '✓ CNAME verificado' : 'CNAME aún no resuelve correctamente', d.ok ? 'success' : 'error');
+      } catch (err) {
+        toast(err.detail?.message || err.message, 'error');
+      } finally { setVerifying(false); }
+    };
+
+    const copyCname = async () => {
+      try {
+        await navigator.clipboard.writeText(state.cnameTarget);
+        toast('Copiado ✓', 'success');
+      } catch { toast('No pude copiar', 'error'); }
+    };
+
+    if (state.loading) return html`<div className="card">Cargando…</div>`;
+
+    const dom = state.dominio;
+    const status = dom?.cname_verificado ? 'verified' : (dom ? 'pending' : 'none');
+    const portalUrl = dom?.subdominio && dom.cname_verificado ? `https://${dom.subdominio}/` : null;
+
+    return html`<div className="card domain-card">
+      <h2 className="card-title">Tu portal público</h2>
+      <p className="card-help">Configura el subdominio donde se publicará tu portal de propiedades. Tus visitantes lo verán al compartir un listing.</p>
+
+      <form onSubmit=${onSave} className="domain-form">
+        <label className="form-label" htmlFor="dom-input">Hostname completo</label>
+        <div className="domain-input-row">
+          <input
+            data-testid="domain-input"
+            id="dom-input"
+            className="form-input"
+            placeholder="propiedades.tudominio.com"
+            value=${state.input}
+            onInput=${(e) => setState((s) => ({ ...s, input: e.target.value }))}
+            disabled=${saving}
+          />
+          <button data-testid="domain-save-btn" type="submit" className="btn btn-primary" disabled=${saving}>${saving ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+        <span className="form-help">Ejemplo: <code>propiedades.thebrokers.mx</code></span>
+      </form>
+
+      ${dom ? html`<${Fragment}>
+        <div className=${'status-pill status-' + status} data-testid="domain-status">
+          ${status === 'verified' ? html`<${Fragment}><span className="dot ok"></span> Activo · CNAME verificado<//>` :
+            html`<${Fragment}><span className="dot pending"></span> Pendiente · esperando configuración DNS<//>`}
+        </div>
+
+        ${portalUrl ? html`<div className="portal-link">
+          Tu portal en vivo:
+          <a href=${portalUrl} target="_blank" rel="noopener">${portalUrl}</a>
+        </div>` : null}
+
+        <div className="cname-instructions">
+          <h3>Instrucciones de DNS</h3>
+          <p>Agrega este registro <strong>CNAME</strong> en tu proveedor DNS (Cloudflare, GoDaddy, Route53, etc.):</p>
+          <table className="dns-table">
+            <thead><tr><th>Tipo</th><th>Nombre</th><th>Valor</th></tr></thead>
+            <tbody><tr>
+              <td><code>CNAME</code></td>
+              <td><code>${dom.subdominio.split('.')[0]}</code> <span className="td-help">(o el subdominio que elegiste)</span></td>
+              <td>
+                <div className="value-row">
+                  <code data-testid="cname-target">${state.cnameTarget}</code>
+                  <button type="button" className="btn-link" onClick=${copyCname}>Copiar</button>
+                </div>
+              </td>
+            </tr></tbody>
+          </table>
+          <p className="dns-tip">La propagación DNS puede tardar entre <strong>1 minuto y 24 horas</strong>. Verificamos automáticamente cada minuto.</p>
+
+          <div className="verify-row">
+            <button data-testid="verify-now-btn" type="button" className="btn btn-ghost" onClick=${onVerify} disabled=${verifying}>${verifying ? 'Verificando DNS…' : 'Verificar ahora'}</button>
+            ${verifyResult ? html`<span className=${'verify-result ' + (verifyResult.ok ? 'ok' : 'err')}>
+              ${verifyResult.ok
+                ? html`✓ Resuelve a ${verifyResult.resolved_to?.join(', ')}`
+                : html`✗ ${verifyResult.error || 'No verificado'}`}
+            </span>` : null}
+          </div>
+
+          ${status === 'verified' ? html`<div className="next-step">
+            <strong>Último paso (manual):</strong> el creador de la plataforma debe agregar <code>${dom.subdominio}</code> como dominio custom en el dashboard de Railway para activar el SSL. Avísale por email a <a href="mailto:soporte@mktscaled.com">soporte@mktscaled.com</a>.
+          </div>` : null}
+        </div>
+      <//>` : null}
+    </div>`;
+  }
+
+  // -------------------------------------------------------------------
   // App root
   // -------------------------------------------------------------------
   function App() {
@@ -1010,7 +1158,7 @@
       case 'listings': body = html`<${Placeholder} title="Mis listings" subtitle="La tabla con búsqueda y filtros está lista para construirse sobre /api/property." />`; break;
       case 'collections': body = html`<${CollectionsPage} ctx=${ctx} />`; break;
       case 'team': body = html`<${TeamPage} ctx=${ctx} />`; break;
-      case 'settings': body = html`<${Placeholder} title="Configuración" subtitle="Marca, dominio y widget de contacto. Próxima iteración." />`; break;
+      case 'settings': body = html`<${SettingsPage} ctx=${ctx} />`; break;
       default: body = null;
     }
 
