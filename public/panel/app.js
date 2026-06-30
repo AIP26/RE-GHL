@@ -577,15 +577,33 @@
   // -------------------------------------------------------------------
   // CollectionsPage — Paso 7
   // -------------------------------------------------------------------
+  // Helper: filtra URLs que apuntan a fotos de propiedad (`/tenants/X/properties/`).
+  // Una colección sólo debería mostrar fotos subidas explícitamente para ella.
+  function safeCollectionPhoto(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (/\/tenants\/[^/]+\/properties\//i.test(url)) return '';
+    return url;
+  }
+
   function CollectionsPage({ ctx }) {
     const [editing, setEditing] = useState(null); // null | { id?, nombre, foto_url }
-    const [openMenuId, setOpenMenuId] = useState(null);
+    const [openMenu, setOpenMenu] = useState(null); // { id, c, anchor }
 
-    // Cierra el menú flotante al click fuera
+    // Cierra el menú al click fuera, scroll o resize. Excepción: scroll dentro
+    // del propio menu floating no debe cerrarlo.
     useEffect(() => {
-      const onDocClick = () => setOpenMenuId(null);
-      document.addEventListener('click', onDocClick);
-      return () => document.removeEventListener('click', onDocClick);
+      const close = (ev) => {
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.coll-card-menu-pop')) return;
+        setOpenMenu(null);
+      };
+      document.addEventListener('click', close);
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, true);
+      return () => {
+        document.removeEventListener('click', close);
+        window.removeEventListener('resize', close);
+        window.removeEventListener('scroll', close, true);
+      };
     }, []);
 
     const buildUrl = (slug) => {
@@ -640,24 +658,23 @@
         <div className="coll-grid">
           ${ctx.colecciones.map((c) => {
             const url = buildUrl(c.slug);
-            const menuOpen = openMenuId === c.id;
+            const cover = safeCollectionPhoto(c.foto_url);
             return html`<div key=${c.id} className="coll-card" data-testid=${'collection-card-' + c.slug}>
               <div className="coll-card-cover">
-                ${c.foto_url
-                  ? html`<img src=${c.foto_url} alt=${c.nombre} />`
+                ${cover
+                  ? html`<img src=${cover} alt=${c.nombre} />`
                   : html`<div className="coll-card-cover-placeholder">${c.nombre.charAt(0).toUpperCase()}</div>`}
                 <button
                   data-testid=${'collection-menu-' + c.slug}
                   className="coll-card-menu"
-                  onClick=${(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : c.id); }}
+                  onClick=${(e) => {
+                    e.stopPropagation();
+                    if (openMenu?.id === c.id) { setOpenMenu(null); return; }
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setOpenMenu({ id: c.id, c, anchor: { top: r.top, left: r.left, bottom: r.bottom, right: r.right, width: r.width, height: r.height } });
+                  }}
                   title="Más acciones"
                 >···</button>
-                ${menuOpen ? html`<div className="coll-card-menu-pop" onClick=${(e) => e.stopPropagation()}>
-                  <button onClick=${() => { setEditing({ ...c }); setOpenMenuId(null); }}>Renombrar / Cambiar foto</button>
-                  <button onClick=${() => { copyUrl(url); setOpenMenuId(null); }}>Copiar URL</button>
-                  ${url ? html`<a href=${url} target="_blank" rel="noreferrer" onClick=${() => setOpenMenuId(null)}>Abrir en pestaña</a>` : null}
-                  <button className="danger" onClick=${() => { setOpenMenuId(null); onDelete(c); }}>Eliminar</button>
-                </div>` : null}
               </div>
               <div className="coll-card-body">
                 <div className="coll-card-name">${c.nombre}</div>
@@ -684,14 +701,76 @@
         onClose=${() => setEditing(null)}
         onSaved=${async () => { await ctx.reloadCollections(); setEditing(null); }}
       />` : null}
+
+      ${openMenu ? createPortal(
+        h(CollectionMenuPortal, {
+          anchor: openMenu.anchor,
+          c: openMenu.c,
+          url: buildUrl(openMenu.c.slug),
+          onClose: () => setOpenMenu(null),
+          onEdit: () => { setEditing({ ...openMenu.c }); setOpenMenu(null); },
+          onCopyUrl: () => { copyUrl(buildUrl(openMenu.c.slug)); setOpenMenu(null); },
+          onDelete: () => { const c = openMenu.c; setOpenMenu(null); onDelete(c); },
+        }),
+        document.body
+      ) : null}
     <//>`;
+  }
+
+  // Floating dropdown para colecciones — mismo patrón que RowMenuPortal (Mis listings)
+  function CollectionMenuPortal({ anchor, c, url, onClose, onEdit, onCopyUrl, onDelete }) {
+    const ref = useRef(null);
+    const [pos, setPos] = useState(null);
+
+    useEffect(() => {
+      if (!ref.current) return;
+      const menuH = ref.current.offsetHeight;
+      const menuW = ref.current.offsetWidth;
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const spaceBelow = vh - anchor.bottom;
+      const spaceAbove = anchor.top;
+      let top = anchor.bottom + 4;
+      let left = anchor.right - menuW;
+      if (spaceBelow < menuH + 12 && spaceAbove > spaceBelow) {
+        top = anchor.top - menuH - 4;
+      }
+      if (left < 8) left = 8;
+      if (left + menuW > vw - 8) left = vw - menuW - 8;
+      if (top < 8) top = 8;
+      if (top + menuH > vh - 8) top = vh - menuH - 8;
+      setPos({ top, left });
+    }, [anchor]);
+
+    return html`<div
+      ref=${ref}
+      className="coll-card-menu-pop row-menu-floating"
+      data-testid=${'collection-menu-pop-' + c.slug}
+      style=${{
+        position: 'fixed',
+        top: (pos?.top ?? -9999) + 'px',
+        left: (pos?.left ?? -9999) + 'px',
+        visibility: pos ? 'visible' : 'hidden',
+        zIndex: 1000,
+      }}
+      onClick=${(e) => e.stopPropagation()}
+    >
+      <button onClick=${onEdit} data-testid=${'collection-edit-' + c.slug}>Renombrar / Cambiar foto</button>
+      <button onClick=${onCopyUrl} data-testid=${'collection-copy-url-' + c.slug}>Copiar URL</button>
+      ${url ? html`<a href=${url} target="_blank" rel="noreferrer" onClick=${onClose} data-testid=${'collection-open-' + c.slug}>Abrir en pestaña</a>` : null}
+      <button className="danger" onClick=${onDelete} data-testid=${'collection-delete-' + c.slug}>Eliminar</button>
+    </div>`;
   }
 
   // Modal crear/editar colección
   function CollectionModal({ initial, onClose, onSaved }) {
     const isEdit = !!initial.id;
     const [nombre, setNombre] = useState(initial.nombre || '');
-    const [fotoUrl, setFotoUrl] = useState(initial.foto_url || '');
+    // Sanitización defensiva: si `initial.foto_url` apunta a la carpeta
+    // `/tenants/.../properties/` (foto de propiedad asignada como cover por
+    // alguna versión antigua o backfill manual), tratarla como NO existente.
+    // El usuario debe subir explícitamente una foto propia de la colección.
+    const [fotoUrl, setFotoUrl] = useState(safeCollectionPhoto(initial.foto_url));
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -766,13 +845,16 @@
             <div className="coll-photo-uploader">
               ${fotoUrl ? html`<div className="coll-photo-preview">
                 <img src=${fotoUrl} alt="" />
-                <button type="button" className="rm" onClick=${() => setFotoUrl('')}>×</button>
-              </div>` : null}
-              <label className="photo-uploader" style=${{ width: fotoUrl ? '120px' : '100%' }}>
-                <input type="file" accept="image/*" onChange=${(e) => onUpload(e.target.files[0])} />
+                <button type="button" className="rm" onClick=${() => setFotoUrl('')} data-testid="collection-photo-remove">×</button>
+              </div>` : html`<div className="coll-photo-preview coll-photo-preview-empty" data-testid="collection-photo-empty">
+                <div className="coll-card-cover-placeholder">${(nombre || initial.nombre || '?').charAt(0).toUpperCase()}</div>
+              </div>`}
+              <label className="photo-uploader" style=${{ width: '120px', flex: '0 0 120px' }}>
+                <input type="file" accept="image/*" onChange=${(e) => onUpload(e.target.files[0])} data-testid="collection-photo-input" />
                 <div>${uploading ? 'Subiendo…' : (fotoUrl ? '↺ Reemplazar' : '＋ Subir foto')}</div>
               </label>
             </div>
+            <span className="form-help">Si no subes foto, en el grid aparecerá la inicial del nombre como marcador.</span>
           </div>
 
           <div className="action-bar" style=${{ position: 'static', margin: '12px -24px -20px' }}>
