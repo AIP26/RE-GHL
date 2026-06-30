@@ -13,6 +13,7 @@ import agent from './agent.js';
 import analytics from './analytics.js';
 import domain from './domain.js';
 import brand from './brand.js';
+import apikeys from './apikeys.js';
 import { requireSession } from '../middleware/auth.js';
 import { env } from '../config/env.js';
 
