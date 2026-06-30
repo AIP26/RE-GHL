@@ -116,7 +116,7 @@ export async function refreshAccessToken(refreshToken) {
 // Cliente autenticado para la API v2
 // ---------------------------------------------------------------------
 export function ghlClient(accessToken) {
-  return axios.create({
+  const cli = axios.create({
     baseURL: GHL_API_BASE,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -125,6 +125,40 @@ export function ghlClient(accessToken) {
     },
     timeout: 30_000,
   });
+
+  // Interceptor de error: deja un trace ruidoso en stdout para Railway
+  // ANTES de re-lanzar. No mutamos el error — sólo logging.
+  cli.interceptors.response.use(
+    (r) => r,
+    (err) => {
+      const status = err?.response?.status;
+      const cfg = err?.config || err?.response?.config || {};
+      // eslint-disable-next-line no-console
+      console.error(
+        '[ghl:http]',
+        JSON.stringify({
+          method: (cfg.method || '').toUpperCase(),
+          url: cfg.url,
+          params: cfg.params,
+          status,
+          statusText: err?.response?.statusText,
+          requestBody: (() => {
+            try { return typeof cfg.data === 'string' ? JSON.parse(cfg.data) : cfg.data; }
+            catch { return cfg.data; }
+          })(),
+          responseBody: err?.response?.data,
+          traceId: err?.response?.headers?.['x-trace-id']
+                || err?.response?.headers?.['x-request-id']
+                || err?.response?.headers?.['x-correlation-id'],
+          message: err?.message,
+          code: err?.code,
+        })
+      );
+      return Promise.reject(err);
+    }
+  );
+
+  return cli;
 }
 
 // ---------------------------------------------------------------------

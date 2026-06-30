@@ -20,6 +20,7 @@ const r = Router();
 // Opcional: { _collections: [collectionId, ...] } para asignar colecciones
 // ---------------------------------------------------------------------
 r.post('/', requireSession, async (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
   try {
     const body = req.body || {};
     const fieldIds = getFieldIds();
@@ -34,18 +35,43 @@ r.post('/', requireSession, async (req, res) => {
 
     // Map: shortKey -> fieldKey GHL
     const properties = {};
+    const skipped = [];
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue; // meta-fields (ej. _collections)
       const fieldKey = toGhlFieldKey(shortKey);
-      if (!fieldKey) continue;
+      if (!fieldKey) {
+        skipped.push(shortKey);
+        continue;
+      }
       if (value === '' || value == null) continue;
       properties[fieldKey] = value;
     }
 
-    const record = await createObjectRecord(t.access_token, fieldIds.objectKey, {
+    const ghlPayload = {
       locationId: req.tenant.ghl_location_id,
       properties,
-    });
+    };
+
+    // Logging del REQUEST a GHL (visible en Railway Deploy Logs)
+    console.log(
+      `[property/create:${reqId}] -> POST GHL`,
+      JSON.stringify({
+        tenant: req.tenant.id,
+        locationId: req.tenant.ghl_location_id,
+        objectKey: fieldIds.objectKey,
+        bodyShortKeys: Object.keys(body),
+        skippedUnknownKeys: skipped,
+        propertiesCount: Object.keys(properties).length,
+        properties, // payload exacto que mandamos a GHL
+      })
+    );
+
+    const record = await createObjectRecord(t.access_token, fieldIds.objectKey, ghlPayload);
+
+    console.log(
+      `[property/create:${reqId}] <- GHL OK`,
+      JSON.stringify({ recordId: record?.id || record?._id, keys: Object.keys(record || {}) })
+    );
 
     // Asignar colecciones (si vinieron en _collections)
     if (Array.isArray(body._collections) && body._collections.length) {
@@ -63,19 +89,73 @@ r.post('/', requireSession, async (req, res) => {
 
     res.json({ ok: true, record, slug });
   } catch (err) {
-    console.error('[property/create]', err?.response?.data || err);
-    res.status(500).json({
+    const status = err?.response?.status;
+    const statusText = err?.response?.statusText;
+    const ghlBody = err?.response?.data;
+    const ghlHeaders = err?.response?.headers;
+    const cfg = err?.response?.config || err?.config;
+
+    // Log FULL del error de GHL — esto es lo que aparecerá en Railway Deploy Logs.
+    console.error(
+      `[property/create:${reqId}] !! GHL ERROR`,
+      JSON.stringify(
+        {
+          status,
+          statusText,
+          method: cfg?.method,
+          url: cfg?.url,
+          requestBody: safeJson(cfg?.data),
+          responseBody: ghlBody,
+          responseHeaders: pickHeaders(ghlHeaders, [
+            'x-trace-id',
+            'x-request-id',
+            'x-correlation-id',
+            'content-type',
+            'date',
+          ]),
+          message: err?.message,
+        },
+        null,
+        2
+      )
+    );
+
+    res.status(status && status < 500 ? status : 500).json({
       error: 'ghl_create_failed',
-      detail: err?.response?.data || err.message,
+      reqId,
+      ghl_status: status,
+      ghl_status_text: statusText,
+      ghl_response: ghlBody,
+      message: err?.message,
     });
   }
 });
+
+// Utilidades de logging — no exportadas; locales al archivo.
+function safeJson(s) {
+  if (s == null) return null;
+  if (typeof s === 'string') {
+    try { return JSON.parse(s); } catch { return s; }
+  }
+  return s;
+}
+
+function pickHeaders(h, keys) {
+  if (!h) return null;
+  const out = {};
+  for (const k of keys) {
+    const v = typeof h.get === 'function' ? h.get(k) : h[k];
+    if (v != null) out[k] = v;
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------
 // GET /api/property — lista propiedades del tenant (paginada)
 // Query: ?limit=20&offset=0&q=texto
 // ---------------------------------------------------------------------
 r.get('/', requireSession, async (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
   try {
     const fieldIds = getFieldIds();
     const t = await getTenantWithTokens(req.tenant.id);
@@ -90,8 +170,23 @@ r.get('/', requireSession, async (req, res) => {
     });
     res.json(data);
   } catch (err) {
-    console.error('[property/list]', err?.response?.data || err);
-    res.status(500).json({ error: 'ghl_list_failed', detail: err?.response?.data || err.message });
+    const status = err?.response?.status;
+    console.error(
+      `[property/list:${reqId}] !! GHL ERROR`,
+      JSON.stringify({
+        status,
+        url: err?.response?.config?.url,
+        responseBody: err?.response?.data,
+        message: err?.message,
+      }, null, 2)
+    );
+    res.status(status && status < 500 ? status : 500).json({
+      error: 'ghl_list_failed',
+      reqId,
+      ghl_status: status,
+      ghl_response: err?.response?.data,
+      message: err?.message,
+    });
   }
 });
 
@@ -122,6 +217,7 @@ r.get('/:id', requireSession, async (req, res) => {
 // PUT /api/property/:id — actualizar
 // ---------------------------------------------------------------------
 r.put('/:id', requireSession, async (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
   try {
     const body = req.body || {};
     const fieldIds = getFieldIds();
@@ -135,19 +231,47 @@ r.put('/:id', requireSession, async (req, res) => {
       properties[fieldKey] = value;
     }
 
+    const ghlPayload = {
+      locationId: req.tenant.ghl_location_id,
+      properties,
+    };
+
+    console.log(
+      `[property/update:${reqId}] -> PUT GHL`,
+      JSON.stringify({
+        recordId: req.params.id,
+        objectKey: fieldIds.objectKey,
+        propertiesCount: Object.keys(properties).length,
+        properties,
+      })
+    );
+
     const record = await updateObjectRecord(
       t.access_token,
       fieldIds.objectKey,
       req.params.id,
-      {
-        locationId: req.tenant.ghl_location_id,
-        properties,
-      }
+      ghlPayload
     );
     res.json({ ok: true, record });
   } catch (err) {
-    console.error('[property/update]', err?.response?.data || err);
-    res.status(500).json({ error: 'ghl_update_failed', detail: err?.response?.data || err.message });
+    const status = err?.response?.status;
+    console.error(
+      `[property/update:${reqId}] !! GHL ERROR`,
+      JSON.stringify({
+        status,
+        url: err?.response?.config?.url,
+        requestBody: (() => { try { return JSON.parse(err?.response?.config?.data || 'null'); } catch { return err?.response?.config?.data; } })(),
+        responseBody: err?.response?.data,
+        message: err?.message,
+      }, null, 2)
+    );
+    res.status(status && status < 500 ? status : 500).json({
+      error: 'ghl_update_failed',
+      reqId,
+      ghl_status: status,
+      ghl_response: err?.response?.data,
+      message: err?.message,
+    });
   }
 });
 
