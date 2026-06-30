@@ -34,16 +34,12 @@ r.post('/', requireSession, async (req, res) => {
     if (!body.agente_responsable) body.agente_responsable = req.agente.ghl_user_id;
 
     // Map: shortKey -> field ID interno de GHL (NO fieldKey).
-    // La Custom Object Records API espera el ID del campo como key.
-    // OJO: el primary display property ("titulo") va al nivel del record
-    // como `name`, NO dentro de `properties`. GHL lo exige así o devuelve
-    // required_property_missing aunque el id correcto esté en properties.
-    const PRIMARY_SHORTKEY = 'titulo';
+    // La Custom Object Records API espera el ID del campo como key dentro
+    // de `properties`. El campo primario (titulo) también va aquí.
     const properties = {};
     const skipped = [];
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue; // meta-fields (ej. _collections)
-      if (shortKey === PRIMARY_SHORTKEY) continue; // se manda como `name`
       const fieldId = toGhlFieldId(shortKey);
       if (!fieldId) {
         skipped.push(shortKey);
@@ -55,7 +51,7 @@ r.post('/', requireSession, async (req, res) => {
 
     const ghlPayload = {
       locationId: req.tenant.ghl_location_id,
-      name: titulo, // primary display property del schema "propiedad"
+      objectSchemaId: fieldIds.schemaId, // requerido por GHL al crear records
       properties,
     };
 
@@ -66,9 +62,9 @@ r.post('/', requireSession, async (req, res) => {
         tenant: req.tenant.id,
         locationId: req.tenant.ghl_location_id,
         objectKey: fieldIds.objectKey,
+        objectSchemaId: fieldIds.schemaId,
         bodyShortKeys: Object.keys(body),
         skippedUnknownKeys: skipped,
-        name: ghlPayload.name,
         propertiesCount: Object.keys(properties).length,
         properties, // payload exacto que mandamos a GHL
       })
@@ -231,11 +227,9 @@ r.put('/:id', requireSession, async (req, res) => {
     const fieldIds = getFieldIds();
     const t = await getTenantWithTokens(req.tenant.id);
 
-    const PRIMARY_SHORTKEY = 'titulo';
     const properties = {};
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue;
-      if (shortKey === PRIMARY_SHORTKEY) continue; // se manda como `name`
       const fieldId = toGhlFieldId(shortKey);
       if (!fieldId) continue;
       properties[fieldId] = value;
@@ -243,20 +237,16 @@ r.put('/:id', requireSession, async (req, res) => {
 
     const ghlPayload = {
       locationId: req.tenant.ghl_location_id,
+      objectSchemaId: fieldIds.schemaId,
       properties,
     };
-    // El primary display property sólo se actualiza si vino en el body —
-    // en PUT, mandar `name: ""` puede sobreescribir el título existente.
-    if (Object.prototype.hasOwnProperty.call(body, PRIMARY_SHORTKEY) && body[PRIMARY_SHORTKEY]) {
-      ghlPayload.name = body[PRIMARY_SHORTKEY];
-    }
 
     console.log(
       `[property/update:${reqId}] -> PUT GHL`,
       JSON.stringify({
         recordId: req.params.id,
         objectKey: fieldIds.objectKey,
-        name: ghlPayload.name,
+        objectSchemaId: fieldIds.schemaId,
         propertiesCount: Object.keys(properties).length,
         properties,
       })
