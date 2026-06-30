@@ -977,8 +977,8 @@
     const [tab, setTab] = useState('domain');
     const tabs = [
       { id: 'domain', label: 'Dominio' },
-      { id: 'brand', label: 'Marca', disabled: true },
-      { id: 'widget', label: 'Widget de contacto', disabled: true },
+      { id: 'brand', label: 'Marca' },
+      { id: 'widget', label: 'Widget de contacto' },
     ];
     return html`<${Fragment}>
       <div className="page-header"><div>
@@ -988,12 +988,14 @@
       <div className="settings-tabs">
         ${tabs.map((t) => html`<button
           key=${t.id}
+          data-testid=${'settings-tab-' + t.id}
           className=${'settings-tab' + (tab === t.id ? ' active' : '')}
-          disabled=${t.disabled}
-          onClick=${() => !t.disabled && setTab(t.id)}
-        >${t.label}${t.disabled ? ' (próximamente)' : ''}</button>`)}
+          onClick=${() => setTab(t.id)}
+        >${t.label}</button>`)}
       </div>
       ${tab === 'domain' ? html`<${DomainTab} ctx=${ctx} />` : null}
+      ${tab === 'brand' ? html`<${BrandTab} ctx=${ctx} />` : null}
+      ${tab === 'widget' ? html`<${WidgetTab} ctx=${ctx} />` : null}
     <//>`;
   }
 
@@ -1115,6 +1117,297 @@
           </div>` : null}
         </div>
       <//>` : null}
+    </div>`;
+  }
+
+  // -------------------------------------------------------------------
+  // BrandTab — Paso 11
+  // -------------------------------------------------------------------
+  function useBrand() {
+    const [state, setState] = useState({ loading: true, marca: null });
+    const reload = useCallback(async () => {
+      const d = await api('/brand');
+      setState({ loading: false, marca: d.marca || {} });
+    }, []);
+    useEffect(() => { reload(); }, [reload]);
+    return [state, setState, reload];
+  }
+
+  function BrandTab({ ctx }) {
+    const [bs, setBs] = useBrand();
+    const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState({}); // { logo: bool, hero: bool, asoc: bool }
+
+    if (bs.loading) return html`<div className="card">Cargando…</div>`;
+    const m = bs.marca;
+    const set = (k, v) => setBs((s) => ({ ...s, marca: { ...s.marca, [k]: v } }));
+
+    const upload = async (file, slot) => {
+      if (!file) return null;
+      setUploading((u) => ({ ...u, [slot]: true }));
+      try {
+        const sign = await api('/upload/sign', { method: 'POST', body: { kind: 'brand' } });
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('api_key', sign.apiKey);
+        fd.append('timestamp', sign.timestamp);
+        fd.append('folder', sign.folder);
+        fd.append('eager', sign.eager);
+        fd.append('signature', sign.signature);
+        const r = await fetch(sign.uploadUrl, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('upload_failed');
+        const j = await r.json();
+        return j.eager?.[0]?.secure_url || j.secure_url;
+      } catch (e) {
+        toast('Error subiendo imagen: ' + (e.message || e), 'error');
+        return null;
+      } finally {
+        setUploading((u) => ({ ...u, [slot]: false }));
+      }
+    };
+
+    const onLogo = async (file) => { const u = await upload(file, 'logo'); if (u) set('logo_url', u); };
+    const onHero = async (file) => { const u = await upload(file, 'hero'); if (u) set('hero_foto_url', u); };
+    const onAsocAdd = async (file) => {
+      const u = await upload(file, 'asoc');
+      if (!u) return;
+      const name = prompt('Nombre de la asociación (ej. AMPI, CANACO)') || 'Asociación';
+      const list = Array.isArray(m.asociaciones) ? m.asociaciones : [];
+      set('asociaciones', [...list, { nombre: name.trim(), logo_url: u }]);
+    };
+    const onAsocRemove = (i) => {
+      const list = Array.isArray(m.asociaciones) ? m.asociaciones : [];
+      set('asociaciones', list.filter((_, idx) => idx !== i));
+    };
+
+    const onSave = async (e) => {
+      e?.preventDefault?.();
+      setSaving(true);
+      try {
+        // No incluimos campos de widget acá — los maneja WidgetTab
+        const payload = { ...m };
+        delete payload.widget_tipo;
+        delete payload.widget_valor;
+        delete payload.id; delete payload.tenant_id; delete payload.created_at; delete payload.updated_at;
+        await api('/brand', { method: 'PUT', body: payload });
+        toast('Marca guardada ✓', 'success');
+      } catch (err) {
+        toast(err.detail?.message || err.message, 'error');
+      } finally { setSaving(false); }
+    };
+
+    const sub = ctx.portal?.subdominio;
+    const previewHref = sub && ctx.portal?.activo
+      ? `https://${sub}/`
+      : `/?preview=${ctx.tenant.id}`;
+
+    return html`<form className="card brand-card" onSubmit=${onSave}>
+      <div className="brand-section">
+        <h2 className="card-title">Identidad visual</h2>
+        <div className="brand-images">
+          <${ImageUpload}
+            label="Logo de la agencia"
+            value=${m.logo_url}
+            uploading=${uploading.logo}
+            onFile=${onLogo}
+            onClear=${() => set('logo_url', null)}
+            testid="brand-logo"
+          />
+          <${ImageUpload}
+            label="Hero del home"
+            value=${m.hero_foto_url}
+            uploading=${uploading.hero}
+            onFile=${onHero}
+            onClear=${() => set('hero_foto_url', null)}
+            wide=${true}
+            testid="brand-hero"
+          />
+        </div>
+        <div className="brand-colors">
+          <${ColorField} label="Color principal" value=${m.color_principal} onChange=${(v) => set('color_principal', v)} testid="brand-color-primary" />
+          <${ColorField} label="Color secundario" value=${m.color_secundario} onChange=${(v) => set('color_secundario', v)} testid="brand-color-secondary" />
+          <${ColorField} label="Color de acento" value=${m.color_acento} onChange=${(v) => set('color_acento', v)} testid="brand-color-accent" />
+        </div>
+      </div>
+
+      <div className="brand-section">
+        <h2 className="card-title">Datos de contacto</h2>
+        <div className="brand-grid">
+          <${TextField} label="Nombre de la agencia" value=${m.nombre_agencia} onChange=${(v) => set('nombre_agencia', v)} testid="brand-name" full />
+          <${TextField} label="Teléfono" value=${m.telefono} onChange=${(v) => set('telefono', v)} testid="brand-phone" placeholder="+52 998 ..." />
+          <${TextField} label="WhatsApp" value=${m.whatsapp} onChange=${(v) => set('whatsapp', v)} testid="brand-whatsapp" placeholder="+52 998 ..." />
+          <${TextField} label="Email" value=${m.email} onChange=${(v) => set('email', v)} testid="brand-email" type="email" full />
+        </div>
+      </div>
+
+      <div className="brand-section">
+        <h2 className="card-title">Redes sociales</h2>
+        <div className="brand-grid">
+          <${TextField} label="Facebook" value=${m.facebook} onChange=${(v) => set('facebook', v)} placeholder="https://facebook.com/..." />
+          <${TextField} label="Instagram" value=${m.instagram} onChange=${(v) => set('instagram', v)} placeholder="https://instagram.com/..." />
+          <${TextField} label="LinkedIn" value=${m.linkedin} onChange=${(v) => set('linkedin', v)} placeholder="https://linkedin.com/..." />
+          <${TextField} label="YouTube" value=${m.youtube} onChange=${(v) => set('youtube', v)} placeholder="https://youtube.com/..." />
+        </div>
+      </div>
+
+      <div className="brand-section">
+        <h2 className="card-title">Asociaciones</h2>
+        <p className="card-help">Logos que aparecerán en el footer (AMPI, CANACO, etc.).</p>
+        <div className="asoc-grid">
+          ${(Array.isArray(m.asociaciones) ? m.asociaciones : []).map((a, i) => html`
+            <div key=${i} className="asoc-chip">
+              <img src=${a.logo_url} alt=${a.nombre} />
+              <span>${a.nombre}</span>
+              <button type="button" className="rm" onClick=${() => onAsocRemove(i)}>×</button>
+            </div>`)}
+          <label className="asoc-add">
+            <input type="file" accept="image/*" onChange=${(e) => onAsocAdd(e.target.files[0])} />
+            <span>${uploading.asoc ? 'Subiendo…' : '＋ Agregar'}</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="brand-section">
+        <h2 className="card-title">Analytics</h2>
+        <${TextField} label="Google Analytics GA4 tag (opcional)" value=${m.ga4_tag} onChange=${(v) => set('ga4_tag', v)} placeholder="G-XXXXXXXXXX" testid="brand-ga4" full />
+      </div>
+
+      <div className="action-bar" style=${{ position: 'sticky', bottom: 0, background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', padding: '14px 0', margin: '0 -24px -24px', justifyContent: 'space-between' }}>
+        <a href=${previewHref} target="_blank" rel="noopener" className="btn btn-ghost">Vista previa</a>
+        <button data-testid="brand-save-btn" type="submit" className="btn btn-primary" disabled=${saving}>${saving ? 'Guardando…' : 'Guardar cambios'}</button>
+      </div>
+    </form>`;
+  }
+
+  // -------------------------------------------------------------------
+  // WidgetTab — Paso 11
+  // -------------------------------------------------------------------
+  function WidgetTab(/* { ctx } */) {
+    const [bs, setBs] = useBrand();
+    const [saving, setSaving] = useState(false);
+    if (bs.loading) return html`<div className="card">Cargando…</div>`;
+    const m = bs.marca || {};
+    const tipo = m.widget_tipo || 'whatsapp';
+    const setTipo = (t) => setBs((s) => ({ ...s, marca: { ...s.marca, widget_tipo: t } }));
+    const setValor = (v) => setBs((s) => ({ ...s, marca: { ...s.marca, widget_valor: v } }));
+
+    const onSave = async (e) => {
+      e.preventDefault();
+      setSaving(true);
+      try {
+        await api('/brand', { method: 'PUT', body: { widget_tipo: tipo, widget_valor: m.widget_valor || null } });
+        toast('Widget guardado ✓', 'success');
+      } catch (err) {
+        toast(err.detail?.message || err.message, 'error');
+      } finally { setSaving(false); }
+    };
+
+    return html`<form className="card" onSubmit=${onSave} style=${{ padding: '24px' }}>
+      <h2 className="card-title">Widget de contacto</h2>
+      <p className="card-help">Elige UNO. Aparecerá flotante en todas las páginas públicas del portal.</p>
+
+      <div className="widget-options">
+        <label className=${'widget-option' + (tipo === 'whatsapp' ? ' active' : '')}>
+          <input type="radio" name="widget_tipo" value="whatsapp" checked=${tipo === 'whatsapp'} onChange=${() => setTipo('whatsapp')} data-testid="widget-radio-whatsapp" />
+          <div>
+            <div className="widget-option-name">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#25d366" style=${{ verticalAlign: '-4px', marginRight: '6px' }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+              WhatsApp flotante
+            </div>
+            <div className="widget-option-help">Botón verde fijo en cada página del portal. Bottom bar full-width en móvil.</div>
+          </div>
+        </label>
+
+        <label className=${'widget-option' + (tipo === 'livechat' ? ' active' : '')}>
+          <input type="radio" name="widget_tipo" value="livechat" checked=${tipo === 'livechat'} onChange=${() => setTipo('livechat')} data-testid="widget-radio-livechat" />
+          <div>
+            <div className="widget-option-name">GHL Live Chat</div>
+            <div className="widget-option-help">Embebe el chat nativo de GoHighLevel. Los leads entran directo a tu CRM y disparan workflows.</div>
+          </div>
+        </label>
+      </div>
+
+      ${tipo === 'whatsapp' ? html`<div className="widget-config">
+        <label className="form-label">Número de WhatsApp</label>
+        <input
+          data-testid="widget-whatsapp-input"
+          className="form-input"
+          placeholder="+52 998 123 4567"
+          value=${m.widget_valor || ''}
+          onInput=${(e) => setValor(e.target.value)}
+        />
+        <span className="form-help">Incluye el código de país (+52 para México).</span>
+      </div>` : html`<div className="widget-config">
+        <label className="form-label">Snippet HTML del Live Chat de GHL</label>
+        <textarea
+          data-testid="widget-livechat-input"
+          className="form-input"
+          rows="6"
+          placeholder='<script src="https://widget.leadconnectorhq.com/loader.js" data-resources-url="..." data-widget-id="..."></script>'
+          value=${m.widget_valor || ''}
+          onInput=${(e) => setValor(e.target.value)}
+          style=${{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '12px' }}
+        ></textarea>
+        <span className="form-help">Cópialo desde GHL → Sites → Chat Widget → Embed.</span>
+        <div className="next-step" style=${{ marginTop: '10px' }}>
+          <strong>Nota:</strong> Al activar Live Chat, el botón WhatsApp flotante se oculta automáticamente en el portal público.
+        </div>
+      </div>`}
+
+      <div className="action-bar" style=${{ position: 'static', margin: '20px -24px -24px', padding: '14px 24px', borderTop: '1px solid var(--color-border)' }}>
+        <button data-testid="widget-save-btn" type="submit" className="btn btn-primary" disabled=${saving}>${saving ? 'Guardando…' : 'Guardar widget'}</button>
+      </div>
+    </form>`;
+  }
+
+  // Helpers locales reutilizables
+  function ImageUpload({ label, value, uploading, onFile, onClear, wide, testid }) {
+    return html`<div className="img-up">
+      <div className="form-label">${label}</div>
+      ${value ? html`<div className=${'img-up-preview' + (wide ? ' wide' : '')}>
+        <img src=${value} alt="" />
+        <button type="button" className="rm" onClick=${onClear}>×</button>
+      </div>` : html`<label className="photo-uploader" style=${{ aspectRatio: wide ? '16/6' : '1', maxWidth: wide ? 'none' : '140px' }}>
+        <input type="file" accept="image/*" data-testid=${testid} onChange=${(e) => onFile(e.target.files[0])} />
+        <div>${uploading ? 'Subiendo…' : '＋ Subir'}</div>
+      </label>`}
+    </div>`;
+  }
+
+  function ColorField({ label, value, onChange, testid }) {
+    return html`<div className="color-field">
+      <div className="form-label">${label}</div>
+      <div className="color-row">
+        <input
+          type="color"
+          value=${value || '#0f172a'}
+          onInput=${(e) => onChange(e.target.value)}
+          className="color-picker"
+          data-testid=${testid}
+        />
+        <input
+          type="text"
+          value=${value || ''}
+          onInput=${(e) => onChange(e.target.value)}
+          placeholder="#0f172a"
+          className="form-input"
+          style=${{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '13px' }}
+        />
+      </div>
+    </div>`;
+  }
+
+  function TextField({ label, value, onChange, placeholder, type = 'text', testid, full }) {
+    return html`<div className=${'form-field' + (full ? ' full' : '')}>
+      <label className="form-label">${label}</label>
+      <input
+        type=${type}
+        className="form-input"
+        value=${value || ''}
+        onInput=${(e) => onChange(e.target.value)}
+        placeholder=${placeholder || ''}
+        data-testid=${testid || null}
+      />
     </div>`;
   }
 

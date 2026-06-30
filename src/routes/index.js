@@ -12,6 +12,7 @@ import share from './share.js';
 import agent from './agent.js';
 import analytics from './analytics.js';
 import domain from './domain.js';
+import brand from './brand.js';
 import { requireSession } from '../middleware/auth.js';
 import { env } from '../config/env.js';
 
@@ -28,6 +29,7 @@ export function buildApiRouter() {
   r.use('/agent', agent);
   r.use('/analytics', analytics);
   r.use('/domain', domain);
+  r.use('/brand', brand);
 
   // GET /api/runtime-config — config pública que necesita el SPA del menú
   // lateral (Google Maps key, Cloudinary cloud name). Requiere sesión.
