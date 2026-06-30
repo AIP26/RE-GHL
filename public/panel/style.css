@@ -678,6 +678,11 @@ a:hover { text-decoration: underline; }
   margin-top: 2px;
 }
 .row-menu-sep:empty { padding: 0; min-height: 1px; }
+.row-menu-floating {
+  position: fixed; top: auto; right: auto;
+  z-index: 1000;
+  max-height: calc(100vh - 32px); overflow-y: auto;
+}
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; font-size: 13px; color: var(--color-text-muted); }
 .pagination button { background: #fff; border: 1px solid var(--color-border); padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; }

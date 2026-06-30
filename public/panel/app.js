@@ -5,6 +5,7 @@
 (function () {
   'use strict';
   const { createElement: h, useState, useEffect, useCallback, useMemo, useRef, Fragment } = React;
+  const { createPortal } = ReactDOM;
   const html = htm.bind(h);
 
   // -------------------------------------------------------------------
@@ -151,6 +152,32 @@
       }
     }
     return out;
+  }
+
+  // Convierte el record de GHL (+ _collections) -> state del form para edición.
+  // Es la inversa de serializeForm — debe matchear el tipo de cada field.
+  function deserializeFromRecord(record, collections) {
+    const props = record?.properties || {};
+    const state = { _collections: collections || [] };
+    for (const sec of SECTIONS) {
+      for (const f of sec.fields) {
+        if (f.key === '_collections') continue;
+        const v = props[f.key];
+        if (v == null || v === '') continue;
+        if (f.type === 'toggle') {
+          state[f.key] = (v === 'Sí' || v === true || v === 'true' || v === 1 || v === '1');
+        } else if (f.type === 'amenities') {
+          state[f.key] = typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : (Array.isArray(v) ? v : []);
+        } else if (f.type === 'photos') {
+          state[f.key] = typeof v === 'string' ? v.split('|').filter(Boolean) : (Array.isArray(v) ? v : []);
+        } else if (f.type === 'number') {
+          state[f.key] = Number(v);
+        } else {
+          state[f.key] = v;
+        }
+      }
+    }
+    return state;
   }
 
   // -------------------------------------------------------------------
@@ -440,7 +467,7 @@
   // -------------------------------------------------------------------
   // Pages
   // -------------------------------------------------------------------
-  function NewPropertyPage({ ctx }) {
+  function NewPropertyPage({ ctx, editingId, onAfterSave }) {
     const initial = useMemo(() => {
       const s = { _collections: [] };
       for (const sec of SECTIONS) for (const f of sec.fields) {
@@ -450,11 +477,33 @@
     }, []);
     const [state, setState] = useState(initial);
     const [saving, setSaving] = useState(false);
+    const [loadingEdit, setLoadingEdit] = useState(!!editingId);
+    const isEdit = !!editingId;
     const set = useCallback((k, v) => setState((s) => ({ ...s, [k]: v })), []);
+
+    // Si estamos en modo edición, carga el record y prellena el form.
+    useEffect(() => {
+      if (!editingId) return;
+      let cancelled = false;
+      (async () => {
+        setLoadingEdit(true);
+        try {
+          const r = await api('/property/' + editingId);
+          if (cancelled) return;
+          const filled = deserializeFromRecord(r.record, r._collections);
+          // Mantén defaults para keys ausentes
+          setState({ ...initial, ...filled });
+        } catch (err) {
+          toast('No se pudo cargar la propiedad: ' + (err.detail?.error || err.message), 'error');
+        } finally {
+          if (!cancelled) setLoadingEdit(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [editingId, initial]);
 
     const onSubmit = async (e) => {
       e.preventDefault();
-      // Validación mínima de campos requeridos
       for (const sec of SECTIONS) for (const f of sec.fields) {
         if (!f.required) continue;
         if (f.showIf && !f.showIf(state)) continue;
@@ -465,22 +514,32 @@
       setSaving(true);
       try {
         const payload = serializeForm(state);
-        const resp = await api('/property', { method: 'POST', body: payload });
-        toast('Propiedad creada ✓', 'success');
-        setState({ ...initial });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (isEdit) {
+          await api('/property/' + editingId, { method: 'PUT', body: payload });
+          toast('Cambios guardados ✓', 'success');
+          if (onAfterSave) onAfterSave();
+        } else {
+          await api('/property', { method: 'POST', body: payload });
+          toast('Propiedad creada ✓', 'success');
+          setState({ ...initial });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       } catch (err) {
-        toast('Error al crear: ' + (err.detail?.error || err.message), 'error');
+        toast('Error al guardar: ' + (err.detail?.error || err.message), 'error');
       } finally {
         setSaving(false);
       }
     };
 
+    if (loadingEdit) {
+      return html`<div className="card" data-testid="property-form-loading"><div className="empty-state"><h3>Cargando propiedad…</h3></div></div>`;
+    }
+
     return html`
       <div className="page-header">
         <div>
-          <h1 className="page-title">Nueva propiedad</h1>
-          <p className="page-subtitle">Completa los campos. Se publicará en tu portal y queda lista para compartir.</p>
+          <h1 className="page-title" data-testid="property-form-title">${isEdit ? 'Editar propiedad' : 'Nueva propiedad'}</h1>
+          <p className="page-subtitle">${isEdit ? 'Modifica los campos y guarda los cambios.' : 'Completa los campos. Se publicará en tu portal y queda lista para compartir.'}</p>
         </div>
       </div>
       <form onSubmit=${onSubmit}>
@@ -493,8 +552,8 @@
           </div>
         `)}
         <div className="action-bar">
-          <button type="button" className="btn btn-ghost" disabled=${saving} onClick=${() => setState({ ...initial })}>Limpiar</button>
-          <button type="submit" className="btn btn-primary" disabled=${saving}>${saving ? 'Guardando…' : 'Publicar propiedad'}</button>
+          <button type="button" className="btn btn-ghost" disabled=${saving} onClick=${() => setState({ ...initial })} data-testid="property-form-clear">${isEdit ? 'Descartar' : 'Limpiar'}</button>
+          <button type="submit" className="btn btn-primary" disabled=${saving} data-testid="property-form-submit">${saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Publicar propiedad')}</button>
         </div>
       </form>
     `;
@@ -1595,14 +1654,15 @@
   // -------------------------------------------------------------------
   // ListingsPage — Paso 13 (Mis listings + URL orgánica)
   // -------------------------------------------------------------------
-  function ListingsPage({ ctx }) {
+  function ListingsPage({ ctx, setPage, goEdit }) {
     const [loading, setLoading] = useState(true);
     const [records, setRecords] = useState([]);
     const [viewCounts, setViewCounts] = useState({});
     const [filters, setFilters] = useState({ q: '', coleccion: '', estado: '', tipo: '', precio_min: '', precio_max: '', agente: '' });
     const [page, setLocalPage] = useState(1);
-    const [openMenuId, setOpenMenuId] = useState(null);
+    const [openMenu, setOpenMenu] = useState(null); // { id, anchor: {top, left, height} }
     const [shareTarget, setShareTarget] = useState(null);
+    const [agentTarget, setAgentTarget] = useState(null); // record cuyo agente cambiar
     const PAGE_SIZE = 20;
     const isAdmin = ctx.session?.agente?.rol === 'admin'; // may be undefined; show always
 
@@ -1623,10 +1683,21 @@
     }, []);
     useEffect(() => { reload(); }, [reload]);
 
+    // Cerrar dropdown al clickear fuera o scrollear/resize (excepto si el scroll
+    // viene del propio menú floating, que tiene su propio overflow interno).
     useEffect(() => {
-      const onDoc = () => setOpenMenuId(null);
-      document.addEventListener('click', onDoc);
-      return () => document.removeEventListener('click', onDoc);
+      const close = (ev) => {
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.row-menu-floating')) return;
+        setOpenMenu(null);
+      };
+      document.addEventListener('click', close);
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, true);
+      return () => {
+        document.removeEventListener('click', close);
+        window.removeEventListener('resize', close);
+        window.removeEventListener('scroll', close, true);
+      };
     }, []);
 
     // Filtrado client-side
@@ -1734,23 +1805,16 @@
                   <td className="listing-views">${viewCounts[rec.id] || 0}</td>
                   <td>${agt?.nombre || '—'}</td>
                   <td className="listing-actions">
-                    <button data-testid=${'listing-menu-' + rec.id} className="ico-btn" onClick=${(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === rec.id ? null : rec.id); }}>···</button>
-                    ${openMenuId === rec.id ? html`<div className="row-menu" onClick=${(e) => e.stopPropagation()}>
-                      <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener">Ver propiedad</a>
-                      <button onClick=${() => { setOpenMenuId(null); setShareTarget(rec); }} data-testid=${'share-btn-' + rec.id}>URL orgánica</button>
-                      <div className="row-menu-sep">PDF</div>
-                      <a href=${'/p/' + slug + '/pdf?v=con-agente-1pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Con datos · 1 pág</a>
-                      <a href=${'/p/' + slug + '/pdf?v=con-agente-2pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Con datos · 2 págs</a>
-                      <a href=${'/p/' + slug + '/pdf?v=sin-agente-1pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Orgánico · 1 pág</a>
-                      <a href=${'/p/' + slug + '/pdf?v=sin-agente-2pag' + (ctx.portal?.activo ? '' : '&preview=' + ctx.tenant.id)} target="_blank" rel="noopener">Orgánico · 2 págs</a>
-                      <div className="row-menu-sep">Cambiar estado</div>
-                      ${estado !== 'Disponible' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Disponible'); }}>Publicar (Disponible)</button>` : null}
-                      ${estado !== 'Pausada' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Pausada'); }}>Pausar</button>` : null}
-                      ${estado !== 'Vendida' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Vendida'); }}>Marcar vendida</button>` : null}
-                      ${estado !== 'Rentada' ? html`<button onClick=${() => { setOpenMenuId(null); changeEstado(rec, 'Rentada'); }}>Marcar rentada</button>` : null}
-                      <div className="row-menu-sep"></div>
-                      <button className="danger" onClick=${() => { setOpenMenuId(null); onDelete(rec); }}>Eliminar</button>
-                    </div>` : null}
+                    <button
+                      data-testid=${'listing-menu-' + rec.id}
+                      className="ico-btn"
+                      onClick=${(e) => {
+                        e.stopPropagation();
+                        if (openMenu?.id === rec.id) { setOpenMenu(null); return; }
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setOpenMenu({ id: rec.id, rec, anchor: { top: r.top, left: r.left, bottom: r.bottom, right: r.right, width: r.width, height: r.height } });
+                      }}
+                    >···</button>
                   </td>
                 </tr>`;
               })}
@@ -1769,7 +1833,140 @@
         property=${shareTarget}
         onClose=${() => setShareTarget(null)}
       />` : null}
+
+      ${agentTarget ? html`<${ChangeAgentModal}
+        ctx=${ctx}
+        record=${agentTarget}
+        onClose=${() => setAgentTarget(null)}
+        onSaved=${async () => { setAgentTarget(null); await reload(); }}
+      />` : null}
+
+      ${openMenu ? createPortal(
+        h(RowMenuPortal, {
+          anchor: openMenu.anchor,
+          rec: openMenu.rec,
+          ctx,
+          portalBase,
+          onClose: () => setOpenMenu(null),
+          onEdit: () => { setOpenMenu(null); goEdit(openMenu.rec.id); },
+          onShare: () => { setOpenMenu(null); setShareTarget(openMenu.rec); },
+          onChangeAgent: () => { setOpenMenu(null); setAgentTarget(openMenu.rec); },
+          onChangeEstado: (nuevo) => { setOpenMenu(null); changeEstado(openMenu.rec, nuevo); },
+          onDelete: () => { setOpenMenu(null); onDelete(openMenu.rec); },
+        }),
+        document.body
+      ) : null}
     <//>`;
+  }
+
+  // Floating dropdown menu rendered via portal — flips up when near bottom.
+  function RowMenuPortal({ anchor, rec, ctx, portalBase, onClose, onEdit, onShare, onChangeAgent, onChangeEstado, onDelete }) {
+    const ref = useRef(null);
+    const [pos, setPos] = useState(null);
+    const p = rec.properties || {};
+    const estado = p.estado || 'Disponible';
+    const slug = p.slug_url || rec.id;
+    const previewQS = ctx.portal?.activo ? '' : ('&preview=' + ctx.tenant.id);
+
+    // Posicionar tras montar: calcular si cabe debajo o si debe subir.
+    useEffect(() => {
+      if (!ref.current) return;
+      const menuH = ref.current.offsetHeight;
+      const menuW = ref.current.offsetWidth;
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const spaceBelow = vh - anchor.bottom;
+      const spaceAbove = anchor.top;
+      // Por defecto se abre HACIA ABAJO debajo del botón, alineado a la derecha.
+      let top = anchor.bottom + 4;
+      let left = anchor.right - menuW;
+      // Si no cabe abajo pero sí arriba, flip-up.
+      if (spaceBelow < menuH + 12 && spaceAbove > spaceBelow) {
+        top = anchor.top - menuH - 4;
+      }
+      // Mantener dentro del viewport horizontalmente
+      if (left < 8) left = 8;
+      if (left + menuW > vw - 8) left = vw - menuW - 8;
+      // Mantener dentro verticalmente (caso extremo)
+      if (top < 8) top = 8;
+      if (top + menuH > vh - 8) top = vh - menuH - 8;
+      setPos({ top, left });
+    }, [anchor]);
+
+    return html`<div
+      ref=${ref}
+      className="row-menu row-menu-floating"
+      data-testid=${'listing-menu-pop-' + rec.id}
+      style=${{
+        position: 'fixed',
+        top: (pos?.top ?? -9999) + 'px',
+        left: (pos?.left ?? -9999) + 'px',
+        visibility: pos ? 'visible' : 'hidden',
+        zIndex: 1000,
+      }}
+      onClick=${(e) => e.stopPropagation()}
+    >
+      <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener" data-testid=${'listing-view-' + rec.id}>Ver propiedad</a>
+      <button onClick=${onEdit} data-testid=${'listing-edit-' + rec.id}>Editar</button>
+      <button onClick=${onChangeAgent} data-testid=${'listing-change-agent-' + rec.id}>Cambiar agente</button>
+      <button onClick=${onShare} data-testid=${'share-btn-' + rec.id}>URL orgánica</button>
+      <div className="row-menu-sep">PDF</div>
+      <a href=${'/p/' + slug + '/pdf?v=con-agente-1pag' + previewQS} target="_blank" rel="noopener">Con datos · 1 pág</a>
+      <a href=${'/p/' + slug + '/pdf?v=con-agente-2pag' + previewQS} target="_blank" rel="noopener">Con datos · 2 págs</a>
+      <a href=${'/p/' + slug + '/pdf?v=sin-agente-1pag' + previewQS} target="_blank" rel="noopener">Orgánico · 1 pág</a>
+      <a href=${'/p/' + slug + '/pdf?v=sin-agente-2pag' + previewQS} target="_blank" rel="noopener">Orgánico · 2 págs</a>
+      <div className="row-menu-sep">Cambiar estado</div>
+      ${estado !== 'Disponible' ? html`<button onClick=${() => onChangeEstado('Disponible')}>Publicar (Disponible)</button>` : null}
+      ${estado !== 'Pausada' ? html`<button onClick=${() => onChangeEstado('Pausada')}>Pausar</button>` : null}
+      ${estado !== 'Vendida' ? html`<button onClick=${() => onChangeEstado('Vendida')}>Marcar vendida</button>` : null}
+      ${estado !== 'Rentada' ? html`<button onClick=${() => onChangeEstado('Rentada')}>Marcar rentada</button>` : null}
+      <div className="row-menu-sep"></div>
+      <button className="danger" onClick=${onDelete} data-testid=${'listing-delete-' + rec.id}>Eliminar</button>
+    </div>`;
+  }
+
+  // Modal "Cambiar agente" — dropdown de agentes activos + guardar.
+  function ChangeAgentModal({ ctx, record, onClose, onSaved }) {
+    const agentes = (ctx.agentes || []).filter((a) => a.activo !== false);
+    const current = record?.properties?.agente_responsable || '';
+    const [selected, setSelected] = useState(current);
+    const [saving, setSaving] = useState(false);
+
+    const onSave = async () => {
+      if (!selected) { toast('Selecciona un agente', 'error'); return; }
+      if (selected === current) { toast('Es el mismo agente actual', 'info'); return; }
+      setSaving(true);
+      try {
+        await api('/property/' + record.id, { method: 'PUT', body: { agente_responsable: selected } });
+        toast('Agente actualizado ✓', 'success');
+        if (onSaved) onSaved();
+      } catch (e) {
+        toast('Error: ' + (e.detail?.message || e.message), 'error');
+      } finally { setSaving(false); }
+    };
+
+    return html`<div className="modal-backdrop" onClick=${onClose} data-testid="change-agent-modal">
+      <div className="modal" onClick=${(e) => e.stopPropagation()} style=${{ maxWidth: '440px', padding: '24px' }}>
+        <h3 style=${{ marginTop: 0 }}>Cambiar agente</h3>
+        <p className="card-help" style=${{ marginBottom: '14px' }}>
+          Reasigna esta propiedad a otro agente del equipo. Se actualizará en GHL inmediatamente.
+        </p>
+        <label className="form-label">Agente responsable</label>
+        <select
+          data-testid="change-agent-select"
+          className="form-input"
+          value=${selected}
+          onChange=${(e) => setSelected(e.target.value)}
+        >
+          <option value="">— Selecciona —</option>
+          ${agentes.map((a) => html`<option key=${a.ghl_user_id} value=${a.ghl_user_id}>${a.nombre}${a.email ? ' · ' + a.email : ''}</option>`)}
+        </select>
+        <div style=${{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
+          <button data-testid="change-agent-cancel" className="btn btn-ghost" onClick=${onClose}>Cancelar</button>
+          <button data-testid="change-agent-save" className="btn btn-primary" disabled=${saving} onClick=${onSave}>${saving ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+    </div>`;
   }
 
   // Modal URL orgánica
@@ -1881,8 +2078,19 @@
   // -------------------------------------------------------------------
   function App() {
     const boot = useBootstrap();
-    const [page, setPage] = useState('new');
+    const [page, _setPage] = useState('new');
+    const [editingId, setEditingId] = useState(null);
     const [mobile, setMobile] = useState(false);
+    // setPage wrapper: si navegas a algo que NO sea 'edit', limpia editingId.
+    const setPage = useCallback((p) => {
+      if (p !== 'edit') setEditingId(null);
+      _setPage(p);
+    }, []);
+    const goEdit = useCallback((id) => {
+      setEditingId(id);
+      _setPage('edit');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
     // Estado liftado: colecciones mutan desde la pantalla Colecciones, pero
     // las usa también el form de propiedad (chips para asignar).
     const [colecciones, setColecciones] = useState([]);
@@ -1906,6 +2114,7 @@
       setColecciones,
       googleMapsApiKey: boot.config.googleMapsApiKey,
       tenant: boot.session.tenant,
+      session: boot.session,
       portal: boot.portal,
     };
 
@@ -1913,7 +2122,8 @@
     switch (page) {
       case 'dashboard': body = html`<${Dashboard} ctx=${ctx} />`; break;
       case 'new': body = html`<${NewPropertyPage} ctx=${ctx} />`; break;
-      case 'listings': body = html`<${ListingsPage} ctx=${ctx} setPage=${setPage} />`; break;
+      case 'edit': body = html`<${NewPropertyPage} ctx=${ctx} editingId=${editingId} onAfterSave=${() => setPage('listings')} />`; break;
+      case 'listings': body = html`<${ListingsPage} ctx=${ctx} setPage=${setPage} goEdit=${goEdit} />`; break;
       case 'collections': body = html`<${CollectionsPage} ctx=${ctx} />`; break;
       case 'team': body = html`<${TeamPage} ctx=${ctx} />`; break;
       case 'settings': body = html`<${SettingsPage} ctx=${ctx} />`; break;
