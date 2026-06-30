@@ -224,3 +224,128 @@ a:hover { text-decoration: underline; }
 @media (max-width: 768px) {
   .action-bar { margin: 16px -16px -16px; }
 }
+
+/* =====================================================================
+   Colecciones (Paso 7)
+   ===================================================================== */
+.coll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.coll-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: box-shadow .15s, transform .05s;
+}
+.coll-card:hover { box-shadow: var(--shadow); }
+.coll-card-cover {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  overflow: hidden;
+}
+.coll-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coll-card-cover-placeholder {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.7); font-size: 60px; font-weight: 700;
+}
+.coll-card-menu {
+  position: absolute; top: 8px; right: 8px;
+  width: 32px; height: 32px;
+  background: rgba(0,0,0,.6); color: #fff;
+  border: 0; border-radius: 50%;
+  font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  letter-spacing: 1px;
+}
+.coll-card-menu:hover { background: rgba(0,0,0,.8); }
+.coll-card-menu-pop {
+  position: absolute; top: 44px; right: 8px;
+  background: #fff; border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  min-width: 200px; z-index: 5;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.coll-card-menu-pop button,
+.coll-card-menu-pop a {
+  background: none; border: 0;
+  text-align: left; padding: 10px 14px;
+  font-size: 13px; color: var(--color-text);
+  cursor: pointer; text-decoration: none;
+}
+.coll-card-menu-pop button:hover,
+.coll-card-menu-pop a:hover { background: #f3f4f6; }
+.coll-card-menu-pop .danger { color: var(--color-danger); }
+.coll-card-menu-pop .danger:hover { background: #fef2f2; }
+
+.coll-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.coll-card-name { font-weight: 700; font-size: 15px; color: var(--color-text); }
+.coll-card-meta { font-size: 12px; color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; }
+.coll-card-meta code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.coll-card-meta .dot { opacity: .5; }
+.coll-card-url {
+  font-size: 11px; color: var(--color-text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: #f9fafb; padding: 6px 8px; border-radius: var(--radius-sm);
+  font-family: ui-monospace, Menlo, monospace;
+}
+.coll-card-actions { display: flex; gap: 8px; margin-top: 4px; }
+.coll-card-actions .btn { flex: 1; padding: 7px 10px; font-size: 12px; }
+
+.empty-state { text-align: center; padding: 30px 20px; }
+.empty-state h3 { margin: 0 0 8px; color: var(--color-text); font-size: 16px; }
+.empty-state p { color: var(--color-text-muted); font-size: 14px; margin: 0 0 16px; }
+
+/* =====================================================================
+   Modal genérico (Paso 7+)
+   ===================================================================== */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  width: 100%; max-width: 520px;
+  max-height: 90vh; overflow: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 24px; border-bottom: 1px solid var(--color-border);
+}
+.modal-header h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.modal-close {
+  background: none; border: 0; font-size: 24px; line-height: 1;
+  color: var(--color-text-muted); width: 32px; height: 32px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #f3f4f6; color: var(--color-text); }
+.modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Foto uploader del modal de colección */
+.coll-photo-uploader { display: flex; align-items: stretch; gap: 10px; }
+.coll-photo-preview {
+  position: relative; width: 120px; aspect-ratio: 16/9;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+.coll-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.coll-photo-preview .rm {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,.7); color: #fff;
+  border: 0; width: 22px; height: 22px; border-radius: 50%; font-size: 12px;
+}

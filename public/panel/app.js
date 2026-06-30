@@ -180,6 +180,7 @@
             session: sso, config,
             agentes: agentsData.agentes || [],
             colecciones: collectionsData.colecciones || [],
+            portal: collectionsData.portal || { subdominio: null, activo: false },
           });
         } catch (e) {
           setState({ loading: false, error: e.message || String(e) });
@@ -515,21 +516,246 @@
   }
 
   // -------------------------------------------------------------------
+  // CollectionsPage — Paso 7
+  // -------------------------------------------------------------------
+  function CollectionsPage({ ctx }) {
+    const [editing, setEditing] = useState(null); // null | { id?, nombre, foto_url }
+    const [openMenuId, setOpenMenuId] = useState(null);
+
+    // Cierra el menú flotante al click fuera
+    useEffect(() => {
+      const onDocClick = () => setOpenMenuId(null);
+      document.addEventListener('click', onDocClick);
+      return () => document.removeEventListener('click', onDocClick);
+    }, []);
+
+    const buildUrl = (slug) => {
+      const host = ctx.portal?.subdominio;
+      if (!host) return null;
+      return `https://${host}/coleccion/${slug}`;
+    };
+
+    const copyUrl = async (url) => {
+      if (!url) { toast('Configura tu dominio en Settings para tener URL pública', 'error'); return; }
+      try {
+        await navigator.clipboard.writeText(url);
+        toast('URL copiada ✓', 'success');
+      } catch {
+        toast('No pude copiar — selecciona y copia manualmente', 'error');
+      }
+    };
+
+    const onDelete = async (col) => {
+      if (col.propiedades_count > 0) {
+        if (!confirm(`"${col.nombre}" tiene ${col.propiedades_count} propiedad(es) asignadas. Eliminarla NO borra las propiedades, sólo la colección. ¿Continuar?`)) return;
+      } else if (!confirm(`Eliminar la colección "${col.nombre}"?`)) {
+        return;
+      }
+      try {
+        await api(`/collection/${col.id}`, { method: 'DELETE' });
+        await ctx.reloadCollections();
+        toast('Colección eliminada', 'success');
+      } catch (e) {
+        toast('Error al eliminar: ' + (e.detail?.message || e.message), 'error');
+      }
+    };
+
+    return html`<${Fragment}>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Colecciones</h1>
+          <p className="page-subtitle">Agrupa propiedades en colecciones libres — zona, desarrollo, campaña — y comparte la URL a discreción.</p>
+        </div>
+        <button data-testid="new-collection-btn" className="btn btn-primary" onClick=${() => setEditing({ nombre: '', foto_url: '' })}>＋ Nueva colección</button>
+      </div>
+
+      ${ctx.colecciones.length === 0 ? html`
+        <div className="card">
+          <div className="empty-state">
+            <h3>Aún no tienes colecciones</h3>
+            <p>Crea tu primera colección para agrupar propiedades por zona, tipo, desarrollo o campaña.</p>
+            <button className="btn btn-primary" onClick=${() => setEditing({ nombre: '', foto_url: '' })}>Crear primera colección</button>
+          </div>
+        </div>
+      ` : html`
+        <div className="coll-grid">
+          ${ctx.colecciones.map((c) => {
+            const url = buildUrl(c.slug);
+            const menuOpen = openMenuId === c.id;
+            return html`<div key=${c.id} className="coll-card" data-testid=${'collection-card-' + c.slug}>
+              <div className="coll-card-cover">
+                ${c.foto_url
+                  ? html`<img src=${c.foto_url} alt=${c.nombre} />`
+                  : html`<div className="coll-card-cover-placeholder">${c.nombre.charAt(0).toUpperCase()}</div>`}
+                <button
+                  data-testid=${'collection-menu-' + c.slug}
+                  className="coll-card-menu"
+                  onClick=${(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : c.id); }}
+                  title="Más acciones"
+                >···</button>
+                ${menuOpen ? html`<div className="coll-card-menu-pop" onClick=${(e) => e.stopPropagation()}>
+                  <button onClick=${() => { setEditing({ ...c }); setOpenMenuId(null); }}>Renombrar / Cambiar foto</button>
+                  <button onClick=${() => { copyUrl(url); setOpenMenuId(null); }}>Copiar URL</button>
+                  ${url ? html`<a href=${url} target="_blank" rel="noreferrer" onClick=${() => setOpenMenuId(null)}>Abrir en pestaña</a>` : null}
+                  <button className="danger" onClick=${() => { setOpenMenuId(null); onDelete(c); }}>Eliminar</button>
+                </div>` : null}
+              </div>
+              <div className="coll-card-body">
+                <div className="coll-card-name">${c.nombre}</div>
+                <div className="coll-card-meta">
+                  <span>${c.propiedades_count} propiedad${c.propiedades_count === 1 ? '' : 'es'}</span>
+                  <span className="dot">·</span>
+                  <code>/${c.slug}</code>
+                </div>
+                <div className="coll-card-url" title=${url || 'Configura tu dominio'}>
+                  ${url ? url : html`<em>Configura tu dominio en Settings</em>`}
+                </div>
+                <div className="coll-card-actions">
+                  <button data-testid=${'copy-url-' + c.slug} className="btn btn-ghost" onClick=${() => copyUrl(url)} disabled=${!url}>Copiar URL</button>
+                  <button data-testid=${'edit-' + c.slug} className="btn btn-ghost" onClick=${() => setEditing({ ...c })}>Editar</button>
+                </div>
+              </div>
+            </div>`;
+          })}
+        </div>
+      `}
+
+      ${editing ? html`<${CollectionModal}
+        initial=${editing}
+        onClose=${() => setEditing(null)}
+        onSaved=${async () => { await ctx.reloadCollections(); setEditing(null); }}
+      />` : null}
+    <//>`;
+  }
+
+  // Modal crear/editar colección
+  function CollectionModal({ initial, onClose, onSaved }) {
+    const isEdit = !!initial.id;
+    const [nombre, setNombre] = useState(initial.nombre || '');
+    const [fotoUrl, setFotoUrl] = useState(initial.foto_url || '');
+    const [uploading, setUploading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const onUpload = async (file) => {
+      if (!file) return;
+      setUploading(true);
+      try {
+        const sign = await api('/upload/sign', { method: 'POST', body: { kind: 'collection' } });
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('api_key', sign.apiKey);
+        fd.append('timestamp', sign.timestamp);
+        fd.append('folder', sign.folder);
+        fd.append('eager', sign.eager);
+        fd.append('signature', sign.signature);
+        const r = await fetch(sign.uploadUrl, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('upload_failed');
+        const j = await r.json();
+        const url = j.eager?.[0]?.secure_url || j.secure_url;
+        setFotoUrl(url);
+      } catch (e) {
+        toast('Error subiendo foto: ' + (e.message || e), 'error');
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      const trimmed = nombre.trim();
+      if (!trimmed) { toast('Falta el nombre', 'error'); return; }
+      setSaving(true);
+      try {
+        if (isEdit) {
+          await api('/collection/' + initial.id, { method: 'PUT', body: { nombre: trimmed, foto_url: fotoUrl || null } });
+          toast('Colección actualizada ✓', 'success');
+        } else {
+          await api('/collection', { method: 'POST', body: { nombre: trimmed, foto_url: fotoUrl || null } });
+          toast('Colección creada ✓', 'success');
+        }
+        await onSaved();
+      } catch (err) {
+        toast('Error al guardar: ' + (err.detail?.message || err.message), 'error');
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    return html`<div className="modal-backdrop" onClick=${onClose}>
+      <div className="modal" onClick=${(e) => e.stopPropagation()} data-testid="collection-modal">
+        <div className="modal-header">
+          <h2>${isEdit ? 'Editar colección' : 'Nueva colección'}</h2>
+          <button className="modal-close" onClick=${onClose}>×</button>
+        </div>
+        <form onSubmit=${onSubmit} className="modal-body">
+          <div className="form-field full">
+            <label className="form-label" htmlFor="coll-name">Nombre <span className="req">*</span></label>
+            <input
+              data-testid="collection-name-input"
+              id="coll-name"
+              className="form-input"
+              value=${nombre}
+              onInput=${(e) => setNombre(e.target.value)}
+              placeholder="Ej. Zona Hotelera Cancún"
+              autoFocus
+            />
+            <span className="form-help">El URL slug se genera automáticamente.</span>
+          </div>
+
+          <div className="form-field full">
+            <label className="form-label">Foto (opcional)</label>
+            <div className="coll-photo-uploader">
+              ${fotoUrl ? html`<div className="coll-photo-preview">
+                <img src=${fotoUrl} alt="" />
+                <button type="button" className="rm" onClick=${() => setFotoUrl('')}>×</button>
+              </div>` : null}
+              <label className="photo-uploader" style=${{ width: fotoUrl ? '120px' : '100%' }}>
+                <input type="file" accept="image/*" onChange=${(e) => onUpload(e.target.files[0])} />
+                <div>${uploading ? 'Subiendo…' : (fotoUrl ? '↺ Reemplazar' : '＋ Subir foto')}</div>
+              </label>
+            </div>
+          </div>
+
+          <div className="action-bar" style=${{ position: 'static', margin: '12px -24px -20px' }}>
+            <button type="button" className="btn btn-ghost" onClick=${onClose} disabled=${saving}>Cancelar</button>
+            <button type="submit" data-testid="collection-save-btn" className="btn btn-primary" disabled=${saving || uploading}>${saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear colección')}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
+
+  // -------------------------------------------------------------------
   // App root
   // -------------------------------------------------------------------
   function App() {
     const boot = useBootstrap();
     const [page, setPage] = useState('new');
     const [mobile, setMobile] = useState(false);
+    // Estado liftado: colecciones mutan desde la pantalla Colecciones, pero
+    // las usa también el form de propiedad (chips para asignar).
+    const [colecciones, setColecciones] = useState([]);
+    useEffect(() => {
+      if (boot.colecciones) setColecciones(boot.colecciones);
+    }, [boot.colecciones]);
+
+    const reloadCollections = useCallback(async () => {
+      const d = await api('/collection');
+      setColecciones(d.colecciones || []);
+      return d;
+    }, []);
 
     if (boot.loading) return html`<div className="boot"><div className="boot-spinner"></div><div className="boot-text">Cargando panel…</div></div>`;
     if (boot.error) return html`<div className="boot"><div className="boot-text" style=${{ color: '#dc2626' }}>${boot.error}</div></div>`;
 
     const ctx = {
       agentes: boot.agentes,
-      colecciones: boot.colecciones,
+      colecciones,
+      reloadCollections,
+      setColecciones,
       googleMapsApiKey: boot.config.googleMapsApiKey,
       tenant: boot.session.tenant,
+      portal: boot.portal,
     };
 
     let body;
@@ -537,7 +763,7 @@
       case 'dashboard': body = html`<${Dashboard} ctx=${ctx} />`; break;
       case 'new': body = html`<${NewPropertyPage} ctx=${ctx} />`; break;
       case 'listings': body = html`<${Placeholder} title="Mis listings" subtitle="La tabla con búsqueda y filtros está lista para construirse sobre /api/property." />`; break;
-      case 'collections': body = html`<${Placeholder} title="Colecciones" subtitle="Crear, renombrar y copiar URLs de colecciones — endpoints listos en /api/collection." />`; break;
+      case 'collections': body = html`<${CollectionsPage} ctx=${ctx} />`; break;
       case 'team': body = html`<${Placeholder} title="Mi equipo" subtitle="Gestión de agentes con límites por plan. /api/agent ya devuelve la lista." />`; break;
       case 'settings': body = html`<${Placeholder} title="Configuración" subtitle="Marca, dominio y widget de contacto. Próxima iteración." />`; break;
       default: body = null;

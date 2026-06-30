@@ -195,19 +195,27 @@ r.get('/', requireSession, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
-// GET /api/property/:id — detalle
+// GET /api/property/:id — detalle (incluye colecciones asignadas)
 // ---------------------------------------------------------------------
 r.get('/:id', requireSession, async (req, res) => {
   try {
     const fieldIds = getFieldIds();
     const t = await getTenantWithTokens(req.tenant.id);
-    const record = await getObjectRecord(
-      t.access_token,
-      fieldIds.objectKey,
-      req.params.id,
-      req.tenant.ghl_location_id
-    );
-    res.json({ record });
+    const [record, colsRes] = await Promise.all([
+      getObjectRecord(
+        t.access_token,
+        fieldIds.objectKey,
+        req.params.id,
+        req.tenant.ghl_location_id
+      ),
+      getSupabase()
+        .from('propiedades_colecciones')
+        .select('coleccion_id')
+        .eq('tenant_id', req.tenant.id)
+        .eq('propiedad_id', req.params.id),
+    ]);
+    const collectionIds = (colsRes.data || []).map((r) => r.coleccion_id);
+    res.json({ record, _collections: collectionIds });
   } catch (err) {
     console.error('[property/get]', err?.response?.data || err);
     res.status(err.response?.status || 500).json({
@@ -256,6 +264,30 @@ r.put('/:id', requireSession, async (req, res) => {
       req.params.id,
       ghlPayload
     );
+
+    // Reasignar colecciones si el body incluye _collections (replace semantics):
+    // borramos los vínculos actuales del tenant para esta propiedad y los
+    // re-insertamos. Si _collections viene undefined NO se toca nada.
+    if (Array.isArray(body._collections)) {
+      const sb = getSupabase();
+      await sb
+        .from('propiedades_colecciones')
+        .delete()
+        .eq('tenant_id', req.tenant.id)
+        .eq('propiedad_id', req.params.id);
+      if (body._collections.length) {
+        const rows = body._collections.map((cid) => ({
+          propiedad_id: req.params.id,
+          coleccion_id: cid,
+          tenant_id: req.tenant.id,
+        }));
+        await sb.from('propiedades_colecciones').upsert(rows, {
+          onConflict: 'propiedad_id,coleccion_id',
+          ignoreDuplicates: true,
+        });
+      }
+    }
+
     res.json({ ok: true, record });
   } catch (err) {
     const status = err?.response?.status;
