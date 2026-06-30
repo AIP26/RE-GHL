@@ -109,7 +109,7 @@ yarn dev
 | 3 | Webhook instalar/desinstalar + primer agente admin + SSO iframe | ✅ |
 | 4 | Custom Object "Propiedad" + `ghl-field-ids.json` | ✅ |
 | 5 | Menú lateral React (formulario completo) | ✅ |
-| 6 | Upload fotos → Cloudinary | ⏳ |
+| 6 | Upload fotos → Cloudinary | ✅ |
 | 7 | CRUD Colecciones | ⏳ |
 | 8 | Gestión de agentes + límites por plan | ⏳ |
 | 9 | Portal público (5 páginas) + page_views | ⏳ |
