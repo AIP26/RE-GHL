@@ -1,7 +1,7 @@
 // Step 6 — Backend tests for POST /api/upload/sign (Cloudinary signed direct-upload).
 // Verifies:
 //   - kind=property → folder ".../properties" (plural)  + eager=f_webp,q_80,w_2000,c_limit
-//   - kind=brand    → folder ".../brand"                + eager=f_auto,q_auto
+//   - kind=brand    → folder ".../brand"                + eager=f_auto,c_limit,w_1200
 //   - kind=agent    → folder ".../brand"  (Master Context mapping)
 //   - 401 without Authorization header
 //   - tenant isolation (folder contains the caller's tenant_id, no cross-tenant leak)
@@ -86,14 +86,14 @@ async function run() {
   // ---- kind=brand ----
   const b = await sign(token, { kind: 'brand' });
   log(b.body?.folder === `tenants/${tenant.id}/brand`, 'kind=brand → folder .../brand');
-  log(b.body?.eager === 'f_auto,q_auto', 'kind=brand → eager=f_auto,q_auto');
+  log(b.body?.eager === 'f_auto,c_limit,w_1200', 'kind=brand → eager=f_auto,c_limit,w_1200');
 
   // ---- kind=agent → also maps to /brand ----
   const a = await sign(token, { kind: 'agent' });
   log(a.body?.folder === `tenants/${tenant.id}/brand`,
       'kind=agent → folder .../brand (Master Context mapping)',
       `got "${a.body?.folder}"`);
-  log(a.body?.eager === 'f_auto,q_auto', 'kind=agent → eager=f_auto,q_auto');
+  log(a.body?.eager === 'f_auto,c_limit,w_1200', 'kind=agent → eager=f_auto,c_limit,w_1200');
 
   // ---- kind=collection → also /brand ----
   const c = await sign(token, { kind: 'collection' });
