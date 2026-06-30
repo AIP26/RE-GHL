@@ -31,8 +31,17 @@ export function fieldsByShortKey() {
   return getFieldIds().fields;
 }
 
-/** Resuelve un valor del form (clave corta) al fieldKey completo de GHL. */
+/** Resuelve un valor del form (clave corta) al fieldKey completo de GHL.
+ *  fieldKey = "custom_objects.propiedad.titulo" (formato largo). */
 export function toGhlFieldKey(shortKey) {
   const f = getFieldIds().fields[shortKey];
   return f?.fieldKey || null;
+}
+
+/** Resuelve un valor del form (clave corta) al field ID interno de GHL.
+ *  Es lo que la API de Custom Object Records espera como key dentro
+ *  del objeto `properties` al hacer POST/PUT. */
+export function toGhlFieldId(shortKey) {
+  const f = getFieldIds().fields[shortKey];
+  return f?.id || null;
 }

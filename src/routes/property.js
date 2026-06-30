@@ -9,7 +9,7 @@ import {
   updateObjectRecord,
   getObjectRecord,
 } from '../lib/ghl.js';
-import { getFieldIds, toGhlFieldKey } from '../lib/field-ids.js';
+import { getFieldIds, toGhlFieldId } from '../lib/field-ids.js';
 import { getSupabase } from '../lib/supabase.js';
 
 const r = Router();
@@ -33,18 +33,19 @@ r.post('/', requireSession, async (req, res) => {
     body.fecha_publicacion = new Date().toISOString().slice(0, 10);
     if (!body.agente_responsable) body.agente_responsable = req.agente.ghl_user_id;
 
-    // Map: shortKey -> fieldKey GHL
+    // Map: shortKey -> field ID interno de GHL (NO fieldKey).
+    // La Custom Object Records API espera el ID del campo como key.
     const properties = {};
     const skipped = [];
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue; // meta-fields (ej. _collections)
-      const fieldKey = toGhlFieldKey(shortKey);
-      if (!fieldKey) {
+      const fieldId = toGhlFieldId(shortKey);
+      if (!fieldId) {
         skipped.push(shortKey);
         continue;
       }
       if (value === '' || value == null) continue;
-      properties[fieldKey] = value;
+      properties[fieldId] = value;
     }
 
     const ghlPayload = {
@@ -226,9 +227,9 @@ r.put('/:id', requireSession, async (req, res) => {
     const properties = {};
     for (const [shortKey, value] of Object.entries(body)) {
       if (shortKey.startsWith('_')) continue;
-      const fieldKey = toGhlFieldKey(shortKey);
-      if (!fieldKey) continue;
-      properties[fieldKey] = value;
+      const fieldId = toGhlFieldId(shortKey);
+      if (!fieldId) continue;
+      properties[fieldId] = value;
     }
 
     const ghlPayload = {
