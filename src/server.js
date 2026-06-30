@@ -6,6 +6,8 @@ import compression from 'compression';
 import cors from 'cors';
 import morgan from 'morgan';
 import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { env } from './config/env.js';
 import { buildApiRouter } from './routes/index.js';
@@ -13,6 +15,12 @@ import oauthRoutes from './routes/oauth.js';
 import publicRoutes from './routes/public.js';
 import { resolveTenantByHost } from './middleware/tenant.js';
 import { startJobs } from './jobs/index.js';
+
+// Resolución de paths INDEPENDIENTE del cwd (cwd cambia entre Nixpacks,
+// systemd, supervisor, docker, etc.). __dirname relativo a este archivo es
+// la única forma robusta para servir static en cualquier deploy.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 // Captura defensiva — si algún async escapa al error handler de Express,
 // log y seguir viviendo (mejor que crashear el proceso completo en Railway).
@@ -60,10 +68,27 @@ app.use('/api', buildApiRouter());
 app.use('/auth', oauthRoutes);
 
 // Panel del menú lateral GHL (iframe). Sirve /public/panel/ como SPA.
-// El index.html se sirve para cualquier ruta dentro de /panel para que el
-// hash-routing del SPA funcione tras refresh.
-const panelDir = path.resolve(process.cwd(), 'public/panel');
-app.use('/panel', express.static(panelDir, { index: 'index.html', extensions: ['html'] }));
+// Path absoluto resuelto desde la ubicación de server.js — NO desde cwd
+// (Railway/Nixpacks suelen arrancar con cwd distinto a la raíz del repo).
+const panelDir = path.resolve(REPO_ROOT, 'public', 'panel');
+const panelIndex = path.join(panelDir, 'index.html');
+const panelExists = fs.existsSync(panelIndex);
+
+// eslint-disable-next-line no-console
+console.log(`[boot] panel static -> ${panelDir} (index exists: ${panelExists})`);
+if (!panelExists) {
+  // eslint-disable-next-line no-console
+  console.warn('[boot] WARN /panel servirá 404 — public/panel/index.html no se encontró. Verifica que se commiteó al repo.');
+}
+
+app.use('/panel', express.static(panelDir, { index: 'index.html', extensions: ['html'], fallthrough: true }));
+// Fallback SPA: cualquier ruta bajo /panel/* que NO matchee un archivo estático
+// devuelve index.html para que el routing del SPA (hash-based) funcione tras
+// refresh o deep-link.
+app.get(/^\/panel(\/.*)?$/, (req, res, next) => {
+  if (!panelExists) return next();
+  res.sendFile(panelIndex);
+});
 
 // Páginas públicas multi-tenant: se montan en la raíz, resolviendo el tenant
 // por header Host. Se ejecutan después de /api para que las rutas /api/* no
