@@ -87,14 +87,15 @@ pública profesional en su dominio."*
 - [ ] **Paso 6** — Upload fotos a Cloudinary (WebP, 2000px, q80) + reordenar.
 - [ ] **Paso 7** — CRUD colecciones + asignación N:N.
 - [ ] **Paso 8** — Gestión de agentes + límites por plan.
-- [ ] **Paso 9** — Portal público (5 páginas) + page_views.
-- [ ] **Paso 10** — Configuración dominio + verificación CNAME cada 60s.
-- [ ] **Paso 11** — Personalización marca + widget contacto.
-- [ ] **Paso 12** — Ficha PDF (4 versiones, PDFKit, `/f_jpg`).
-- [ ] **Paso 13** — URL orgánica `fichas_url` + contador vistas + expiración.
+- [x] **Paso 9** — Portal público (5 páginas) + page_views.
+- [x] **Paso 10** — Configuración dominio + verificación CNAME cada 60s.
+- [x] **Paso 11** — Personalización marca + widget contacto.
+- [x] **Paso 12** — Ficha PDF (4 versiones, PDFKit, `/f_jpg`).
+- [x] **Paso 13** — URL orgánica `fichas_url` + contador vistas + expiración.
 
 ### P2 — Distribución / Fase 2
-- [ ] **Paso 14** — API pública v1 + Snapshot GHL + publicación Marketplace.
+- [x] **Paso 14** — API pública v1 (`/api/v1/properties`, `/properties/:id`, `/collections`, `/docs`) + gestión de API keys (`/api/apikeys` CRUD) + UI tab "API" en Configuración. SHA-256 hash, plain_once, last_used_at. 2026-02-15 ✅ Testing 22/22 backend + UI flujo completo PASS (iteration_6.json).
+- [ ] Snapshot GHL + publicación Marketplace (requiere SSO real con JWT de GHL).
 - [ ] Bolsa inmobiliaria entre agentes (proyecto SEPARADO — no mezclar).
 - [ ] Arte automático para redes sociales 1080×1080.
 - [ ] MLS import.
