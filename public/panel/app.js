@@ -357,7 +357,11 @@
       }).catch(() => { /* no-op */ });
       return () => { if (ac) window.google?.maps?.event?.clearInstanceListeners(ac); };
     }, [apiKey]);
-    return html`<input ref=${ref} className="form-input" placeholder=${apiKey ? 'Empieza a escribir la dirección…' : 'Google Maps no configurado'} defaultValue=${value} />`;
+    // Fallback: si el agente escribe manualmente (sin seleccionar de Autocomplete,
+    // o cuando GOOGLE_MAPS_API_KEY no está configurada), igual actualizamos el
+    // state del form. Autocomplete sólo enriquece: cuando dispara place_changed
+    // sobreescribe con la dirección estructurada + lat/lng.
+    return html`<input ref=${ref} className="form-input" placeholder=${apiKey ? 'Empieza a escribir la dirección…' : 'Escribe la dirección manualmente (Google Maps no configurado)'} value=${value || ''} onInput=${(e) => onPlace({ formatted: e.target.value })} />`;
   }
 
   function PhotosInput({ value, onChange }) {
@@ -380,7 +384,7 @@
           fd.append('eager', sign.eager);
           fd.append('signature', sign.signature);
           const r = await fetch(sign.uploadUrl, { method: 'POST', body: fd });
-          if (!r.ok) { toast('Error subiendo foto', 'error'); continue; }
+          if (!r.ok) { toast('Error subiendo foto', 'error'); setUploading((n) => n - 1); continue; }
           const j = await r.json();
           // Preferimos la URL WebP eager si Cloudinary la generó; si no, secure_url
           const eagerUrl = j.eager?.[0]?.secure_url || j.eager?.[0]?.url || j.secure_url;
