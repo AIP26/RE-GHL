@@ -979,6 +979,7 @@
       { id: 'domain', label: 'Dominio' },
       { id: 'brand', label: 'Marca' },
       { id: 'widget', label: 'Widget de contacto' },
+      { id: 'api', label: 'API' },
     ];
     return html`<${Fragment}>
       <div className="page-header"><div>
@@ -996,6 +997,7 @@
       ${tab === 'domain' ? html`<${DomainTab} ctx=${ctx} />` : null}
       ${tab === 'brand' ? html`<${BrandTab} ctx=${ctx} />` : null}
       ${tab === 'widget' ? html`<${WidgetTab} ctx=${ctx} />` : null}
+      ${tab === 'api' ? html`<${ApiTab} ctx=${ctx} />` : null}
     <//>`;
   }
 
@@ -1360,7 +1362,186 @@
     </form>`;
   }
 
-  // Helpers locales reutilizables
+  // -------------------------------------------------------------------
+  // ApiTab — Paso 14: gestión de API keys del tenant
+  // -------------------------------------------------------------------
+  function ApiTab(/* { ctx } */) {
+    const [state, setState] = useState({ loading: true, keys: [], error: null });
+    const [nombre, setNombre] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [revealed, setRevealed] = useState(null); // {id, plain, nombre} — sólo en memoria, hasta cerrar modal
+    const [copied, setCopied] = useState(false);
+
+    const apiBase = (typeof window !== 'undefined') ? (window.location.origin + '/api/v1') : '/api/v1';
+    const docsUrl = (typeof window !== 'undefined') ? (window.location.origin + '/api/v1/docs') : '/api/v1/docs';
+
+    const reload = useCallback(async () => {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const r = await api('/apikeys');
+        setState({ loading: false, keys: r.api_keys || [], error: null });
+      } catch (err) {
+        setState({ loading: false, keys: [], error: err.detail?.error || err.message });
+      }
+    }, []);
+
+    useEffect(() => { reload(); }, [reload]);
+
+    const onCreate = async (e) => {
+      e.preventDefault();
+      const nm = nombre.trim();
+      if (!nm) { toast('Dale un nombre a la API key', 'error'); return; }
+      setCreating(true);
+      try {
+        const r = await api('/apikeys', { method: 'POST', body: { nombre: nm } });
+        setRevealed({ id: r.api_key.id, plain: r.plain_once, nombre: r.api_key.nombre });
+        setNombre('');
+        setCopied(false);
+        await reload();
+      } catch (err) {
+        toast(err.detail?.message || err.message, 'error');
+      } finally { setCreating(false); }
+    };
+
+    const onToggle = async (k) => {
+      try {
+        await api('/apikeys/' + k.id, { method: 'PUT', body: { activa: !k.activa } });
+        toast(k.activa ? 'API key desactivada' : 'API key reactivada', 'success');
+        await reload();
+      } catch (err) { toast(err.detail?.message || err.message, 'error'); }
+    };
+
+    const onDelete = async (k) => {
+      if (!window.confirm('¿Eliminar permanentemente la key "' + k.nombre + '"? Esto revoca el acceso de inmediato.')) return;
+      try {
+        await api('/apikeys/' + k.id, { method: 'DELETE' });
+        toast('API key eliminada', 'success');
+        await reload();
+      } catch (err) { toast(err.detail?.message || err.message, 'error'); }
+    };
+
+    const copyPlain = async () => {
+      if (!revealed?.plain) return;
+      try {
+        await navigator.clipboard.writeText(revealed.plain);
+        setCopied(true);
+        toast('Copiado al portapapeles ✓', 'success');
+      } catch {
+        toast('No se pudo copiar — selecciónalo manualmente', 'error');
+      }
+    };
+
+    return html`<${Fragment}>
+      <div className="card" style=${{ padding: '24px' }}>
+        <h2 className="card-title">API pública v1</h2>
+        <p className="card-help">
+          Conecta tu inventario con sitios externos, CRMs, MLS o automatizaciones.
+          Cada key está vinculada a tu tenant y puedes revocarla en cualquier momento.
+        </p>
+
+        <div className="next-step" style=${{ marginTop: '12px' }}>
+          <div><strong>Base URL:</strong> <code data-testid="api-base-url">${apiBase}</code></div>
+          <div style=${{ marginTop: '4px' }}><strong>Documentación:</strong> <a data-testid="api-docs-link" href=${docsUrl} target="_blank" rel="noopener">${docsUrl}</a></div>
+        </div>
+
+        <form onSubmit=${onCreate} style=${{ display: 'flex', gap: '8px', alignItems: 'end', margin: '18px 0 6px' }}>
+          <div style=${{ flex: 1 }}>
+            <label className="form-label">Nombre de la nueva API key</label>
+            <input
+              data-testid="api-key-name-input"
+              className="form-input"
+              placeholder="Ej: Web pública 2026, Integración Zapier…"
+              value=${nombre}
+              onInput=${(e) => setNombre(e.target.value)}
+              maxLength="80"
+            />
+          </div>
+          <button
+            data-testid="api-key-create-btn"
+            type="submit"
+            className="btn btn-primary"
+            disabled=${creating || !nombre.trim()}
+          >${creating ? 'Generando…' : 'Generar API key'}</button>
+        </form>
+        <span className="form-help">La key completa solo se muestra una vez al crearla. Guárdala en un lugar seguro.</span>
+      </div>
+
+      <div className="card" style=${{ padding: '24px', marginTop: '16px' }}>
+        <h3 className="card-title" style=${{ fontSize: '15px' }}>Tus API keys</h3>
+        ${state.loading ? html`<div>Cargando…</div>` : null}
+        ${state.error ? html`<div className="next-step" style=${{ background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b' }}>Error: ${state.error}</div>` : null}
+        ${!state.loading && !state.error && state.keys.length === 0 ? html`<p className="card-help">Aún no has generado ninguna key. Crea la primera arriba.</p>` : null}
+
+        ${state.keys.length > 0 ? html`<table className="listings-table" data-testid="api-keys-table" style=${{ marginTop: '8px', minWidth: 0 }}>
+          <thead><tr>
+            <th>Nombre</th><th>Prefix</th><th>Estado</th><th>Último uso</th><th>Creada</th><th style=${{ textAlign: 'right' }}>Acciones</th>
+          </tr></thead>
+          <tbody>
+            ${state.keys.map((k) => html`<tr key=${k.id} data-testid=${'api-key-row-' + k.id}>
+              <td>${k.nombre}</td>
+              <td><code style=${{ fontSize: '12px' }}>${k.key_prefix}…</code></td>
+              <td>
+                <span className=${'pill ' + (k.activa ? 'pill-active' : 'pill-paused')}>
+                  ${k.activa ? 'Activa' : 'Desactivada'}
+                </span>
+              </td>
+              <td style=${{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : '—'}
+              </td>
+              <td style=${{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                ${k.created_at ? new Date(k.created_at).toLocaleDateString() : '—'}
+              </td>
+              <td style=${{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <button
+                  data-testid=${'api-key-toggle-' + k.id}
+                  className="btn btn-ghost"
+                  style=${{ padding: '4px 10px', fontSize: '12px' }}
+                  onClick=${() => onToggle(k)}
+                >${k.activa ? 'Desactivar' : 'Reactivar'}</button>
+                <button
+                  data-testid=${'api-key-delete-' + k.id}
+                  className="btn btn-ghost"
+                  style=${{ color: '#c0392b', marginLeft: '6px', padding: '4px 10px', fontSize: '12px' }}
+                  onClick=${() => onDelete(k)}
+                >Eliminar</button>
+              </td>
+            </tr>`)}
+          </tbody>
+        </table>` : null}
+      </div>
+
+      ${revealed ? html`<div className="modal-backdrop" onClick=${() => setRevealed(null)} data-testid="api-key-reveal-modal">
+        <div className="modal" onClick=${(e) => e.stopPropagation()} style=${{ maxWidth: '560px', padding: '24px' }}>
+          <h3 style=${{ marginTop: 0 }}>Tu API key fue creada</h3>
+          <p>Esta es la <strong>única vez</strong> que verás la key completa. Cópiala y guárdala en un gestor seguro — si la pierdes, deberás crear una nueva.</p>
+          <div style=${{
+            background: '#0f172a', color: '#f1f5f9', padding: '12px 14px',
+            borderRadius: '6px', fontFamily: 'ui-monospace, Menlo, monospace',
+            fontSize: '13px', wordBreak: 'break-all', userSelect: 'all',
+          }} data-testid="api-key-plain">${revealed.plain}</div>
+          <div style=${{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button
+              data-testid="api-key-copy-btn"
+              className="btn btn-primary"
+              onClick=${copyPlain}
+            >${copied ? 'Copiado ✓' : 'Copiar al portapapeles'}</button>
+            <button
+              data-testid="api-key-reveal-close"
+              className="btn btn-ghost"
+              onClick=${() => setRevealed(null)}
+            >Cerrar</button>
+          </div>
+          <div style=${{ marginTop: '14px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+            <strong>Ejemplo de uso:</strong>
+            <pre style=${{ background: '#f8fafc', padding: '10px', borderRadius: '4px', overflowX: 'auto', marginTop: '6px' }}>curl -H "X-API-Key: ${revealed.plain}" \\
+  "${apiBase}/properties?limit=5"</pre>
+          </div>
+        </div>
+      </div>` : null}
+    <//>`;
+  }
+
+
   function ImageUpload({ label, value, uploading, onFile, onClear, wide, testid }) {
     return html`<div className="img-up">
       <div className="form-label">${label}</div>
