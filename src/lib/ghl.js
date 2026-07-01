@@ -263,10 +263,13 @@ export async function updateObjectRecord(accessToken, fullObjectKey, recordId, p
   return data?.record || data;
 }
 
-export async function deleteObjectRecord(accessToken, fullObjectKey, recordId, locationId) {
+export async function deleteObjectRecord(accessToken, fullObjectKey, recordId, _locationId) {
+  // NOTA: GHL Custom Objects DELETE NO acepta `locationId` como query param
+  // (a diferencia de POST/PUT). Enviarlo devuelve 422 "property locationId
+  // should not exist". El scope del token ya identifica la location, así que
+  // omitirlo es suficiente. Firma acepta el arg por compat con PUT/POST calls.
   const { data } = await ghlClient(accessToken).delete(
-    `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`,
-    { params: { locationId } }
+    `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`
   );
   return data;
 }
