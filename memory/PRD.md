@@ -95,6 +95,12 @@ pública profesional en su dominio."*
 
 ### P2 — Distribución / Fase 2
 - [x] **Paso 14** — API pública v1 (`/api/v1/properties`, `/properties/:id`, `/collections`, `/docs`) + gestión de API keys (`/api/apikeys` CRUD) + UI tab "API" en Configuración. SHA-256 hash, plain_once, last_used_at. 2026-02-15 ✅ Testing 22/22 backend + UI flujo completo PASS (iteration_6.json).
+- [x] **QA Bloque 0** — Rediseño completo del PDF (viñetas por operación, mapa fallback, PNG transparente). 2026-02 ✅
+- [x] **QA Bloque 1** — Mis Listings: menú flotante (portal-based), editar propiedad, cambio de agente. 2026-02 ✅
+- [x] **QA Bloque 2** — Colecciones: menú flotante, placeholder defensivo para fotos rotas. 2026-02 ✅
+- [x] **QA Bloque 3** — Nueva propiedad: colección inline, D&D fotos, moneda CAD/USD/MXN dinámica. 2026-02 ✅
+- [x] **QA Bloque 4** — CTA con embed formulario GHL (whitelist server-side, iframe sandbox). 2026-02 ✅ (iteration_7.json)
+- [x] **QA Bloque 5** — Buscador `/buscar` accesible con filtros re-editables + reproductor video YouTube/Vimeo en `/p/:slug` + upload de video propio a Cloudinary (`video_propio_url`). 2026-02 ✅ Testing 52/52 PASS (iteration_8.json).
 - [ ] Snapshot GHL + publicación Marketplace (requiere SSO real con JWT de GHL).
 - [ ] Bolsa inmobiliaria entre agentes (proyecto SEPARADO — no mezclar).
 - [ ] Arte automático para redes sociales 1080×1080.
