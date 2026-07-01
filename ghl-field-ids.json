@@ -4,11 +4,11 @@
   "folderId": "AG5F4RBZsGpMDnvb5xek",
   "folderName": "Propiedad Info",
   "locationId": "cNg6MFQcxv8bZnwCppoM",
-  "generatedAt": "2026-06-30T19:24:05.457Z",
+  "generatedAt": "2026-07-01T21:24:05.620Z",
   "summary": {
-    "defined": 55,
-    "created": 7,
-    "skipped": 48,
+    "defined": 56,
+    "created": 1,
+    "skipped": 55,
     "failed": 0
   },
   "fields": {
@@ -23,6 +23,12 @@
       "fieldKey": "custom_objects.propiedad.precio_principal",
       "name": "Precio principal",
       "dataType": "NUMERICAL"
+    },
+    "video_propio_url": {
+      "id": "lkzdP4XKI7HObxaoGSxR",
+      "fieldKey": "custom_objects.propiedad.video_propio_url",
+      "name": "Video propio URL",
+      "dataType": "TEXT"
     },
     "tipo_operacion": {
       "id": "4J3wuaAiY4cSCsfXTc87",

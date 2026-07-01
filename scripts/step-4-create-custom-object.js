@@ -102,6 +102,7 @@ const FIELDS = [
   // Fotos y media
   { fieldKey: 'fotos_urls',          name: 'URLs de fotos',             dataType: 'LARGE_TEXT' },
   { fieldKey: 'video_url',           name: 'Video URL',                 dataType: 'TEXT' },
+  { fieldKey: 'video_propio_url',    name: 'Video propio URL',          dataType: 'TEXT' },
   { fieldKey: 'tour_virtual_url',    name: 'Tour virtual URL',          dataType: 'TEXT' },
   { fieldKey: 'planos_url',          name: 'Planos URL',                dataType: 'TEXT' },
 

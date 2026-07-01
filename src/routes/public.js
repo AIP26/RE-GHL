@@ -273,12 +273,7 @@ r.get('/p/:slug', async (req, res, next) => {
                 <div style="margin-top:8px"><a href="${esc(mapsViewHref(p.latitud, p.longitud))}" target="_blank" rel="noopener" class="btn btn-ghost">Ver en Google Maps</a></div>
               </div>` : ''}
 
-              ${p.video_url ? `<div style="padding:18px 0;border-top:1px solid var(--color-border)">
-                <h3 style="font-size:18px;font-weight:700;margin:0 0 10px">Video</h3>
-                <div style="position:relative;padding-bottom:56.25%;height:0;border-radius:8px;overflow:hidden">
-                  ${ytEmbed(p.video_url)}
-                </div>
-              </div>` : ''}
+              ${renderVideoBlock(p)}
             </div>
 
             <aside class="detail-side">
@@ -419,18 +414,29 @@ r.get('/buscar', async (req, res, next) => {
       brandHeader(brand) +
       `<section class="section">
         <div class="container">
-          <form class="filters" method="GET">
-            <input name="q" placeholder="Texto libre" value="${esc(req.query.q || '')}" />
-            <select name="operacion"><option value="">Operación</option>${['Venta','Renta'].map((o)=>`<option value="${o}" ${req.query.operacion===o?'selected':''}>${o}</option>`).join('')}</select>
-            <select name="tipo"><option value="">Tipo</option>${['Casa','Departamento','Local','Terreno','Oficina','Villa','Penthouse'].map((o)=>`<option value="${o}" ${req.query.tipo===o?'selected':''}>${o}</option>`).join('')}</select>
-            <input name="precio_min" type="number" placeholder="Mín USD" value="${esc(req.query.precio_min || '')}" />
-            <input name="precio_max" type="number" placeholder="Máx USD" value="${esc(req.query.precio_max || '')}" />
-          </form>
+          <details class="filters-details" ${sorted.length === 0 || Object.keys(req.query).length ? 'open' : ''}>
+            <summary class="filters-summary" data-testid="filters-toggle">
+              <span>Filtros</span>
+              <span class="filters-hint">${Object.keys(req.query).filter((k) => req.query[k]).length || 'sin'} activos</span>
+            </summary>
+            <form class="filters filters-form" method="GET" action="/buscar" data-testid="search-filters-form">
+              <input name="q" placeholder="Zona, colonia, palabras clave…" value="${esc(req.query.q || '')}" data-testid="filter-q" />
+              <select name="operacion" data-testid="filter-operacion"><option value="">Cualquier operación</option>${['Venta','Renta'].map((o)=>`<option value="${o}" ${req.query.operacion===o?'selected':''}>${o}</option>`).join('')}</select>
+              <select name="tipo" data-testid="filter-tipo"><option value="">Cualquier tipo</option>${['Casa','Departamento','Local','Terreno','Oficina','Villa','Penthouse'].map((o)=>`<option value="${o}" ${req.query.tipo===o?'selected':''}>${o}</option>`).join('')}</select>
+              <input name="precio_min" type="number" min="0" step="1000" placeholder="Precio mín." value="${esc(req.query.precio_min || '')}" data-testid="filter-precio-min" />
+              <input name="precio_max" type="number" min="0" step="1000" placeholder="Precio máx." value="${esc(req.query.precio_max || '')}" data-testid="filter-precio-max" />
+              <select name="recamaras" data-testid="filter-recamaras"><option value="">Recámaras</option>${[1,2,3,4,5].map((n)=>`<option value="${n}" ${String(req.query.recamaras)===String(n)?'selected':''}>${n}+</option>`).join('')}</select>
+              <div class="filters-actions">
+                <button type="submit" class="btn btn-accent" data-testid="filter-submit-btn">Buscar</button>
+                <a href="/buscar" class="btn btn-ghost" data-testid="filter-clear-btn">Limpiar filtros</a>
+              </div>
+            </form>
+          </details>
           <h1 style="font-size:22px;font-weight:800;margin:18px 0 4px">Resultados de búsqueda</h1>
           <div style="color:var(--color-text-muted);margin-bottom:18px;font-size:14px">${sorted.length} propiedad${sorted.length===1?'':'es'} para «${esc(summary)}»</div>
           ${sorted.length
             ? `<div class="cards-grid">${sorted.map(propertyCard).join('')}</div>`
-            : `<div class="empty"><strong>No encontramos propiedades con esos filtros.</strong><br/><span style="font-size:13px">Prueba quitar algunos filtros o contáctanos para una búsqueda personalizada.</span></div>`}
+            : `<div class="empty"><strong>No encontramos propiedades con esos filtros.</strong><br/><span style="font-size:13px">Prueba quitar algunos filtros o <a href="/buscar" style="color:var(--color-primary);font-weight:600">limpiar la búsqueda</a>.</span></div>`}
         </div>
       </section>
       ${whatsappFab(brand)}` +
@@ -544,6 +550,30 @@ function ytEmbed(url) {
   const vimeo = String(url).match(/vimeo\.com\/(\d+)/);
   if (vimeo) return `<iframe src="https://player.vimeo.com/video/${esc(vimeo[1])}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen></iframe>`;
   return '';
+}
+
+/** Bloque de video en /p/:slug. Prioridad:
+ *  1) video_propio_url (Cloudinary) → <video> nativo con controles.
+ *  2) video_url (YouTube / Vimeo)  → iframe embed responsive 16:9.
+ *  Si ninguno aplica devuelve '' (no se renderiza la sección). */
+function renderVideoBlock(p) {
+  const propio = (p.video_propio_url || '').trim();
+  const embedUrl = (p.video_url || '').trim();
+  const embedHtml = embedUrl ? ytEmbed(embedUrl) : '';
+
+  if (!propio && !embedHtml) return '';
+
+  const player = propio
+    ? `<video src="${esc(propio)}" controls preload="metadata" playsinline
+             style="position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain"></video>`
+    : embedHtml;
+
+  return `<div style="padding:18px 0;border-top:1px solid var(--color-border)">
+    <h3 style="font-size:18px;font-weight:700;margin:0 0 10px">Video</h3>
+    <div style="position:relative;padding-bottom:56.25%;height:0;border-radius:8px;overflow:hidden;background:#000">
+      ${player}
+    </div>
+  </div>`;
 }
 
 function whatsappFab(brand) {

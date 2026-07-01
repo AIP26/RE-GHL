@@ -127,7 +127,8 @@
     ]},
     { title: 'Fotos y media', fields: [
       { key: 'fotos_urls', label: 'Fotos (arrastra para reordenar — la 1ª es la portada)', type: 'photos', required: true, full: true },
-      { key: 'video_url', label: 'Video URL (YouTube/Vimeo)', type: 'text' },
+      { key: 'video_propio_url', label: 'Video propio (sube un mp4/mov, hasta 200 MB)', type: 'video_upload', full: true },
+      { key: 'video_url', label: 'O pega una URL de YouTube / Vimeo', type: 'text', full: true },
       { key: 'tour_virtual_url', label: 'Tour virtual URL (Matterport)', type: 'text' },
       { key: 'planos_url', label: 'Planos URL', type: 'text' },
     ]},
@@ -396,6 +397,11 @@
           ${label}
           <${PhotosInput} value=${value || []} onChange=${(arr) => set(field.key, arr)} />
         </div>`;
+      case 'video_upload':
+        return html`<div className=${'form-field ' + span}>
+          ${label}
+          <${VideoUpload} value=${value || ''} onChange=${(url) => set(field.key, url)} />
+        </div>`;
       case 'collections':
         return html`<div className=${'form-field ' + span}>
           ${label}
@@ -543,6 +549,99 @@
         </label>
       </div>
       ${uploading > 0 ? html`<div className="photo-uploading">Subiendo ${uploading} foto(s)…</div>` : null}
+    `;
+  }
+
+  // Uploader de video propio. Sube directo a Cloudinary con resource_type=video.
+  // Límite 200 MB (validación client-side). Soporta mp4 / mov / webm.
+  function VideoUpload({ value, onChange }) {
+    const [progress, setProgress] = useState(0);      // 0..100 durante upload
+    const [uploading, setUploading] = useState(false);
+    const [err, setErr] = useState('');
+
+    const MAX_BYTES = 200 * 1024 * 1024;
+
+    const uploadFile = async (file) => {
+      if (!file) return;
+      setErr('');
+      if (file.size > MAX_BYTES) {
+        const mb = (file.size / (1024 * 1024)).toFixed(0);
+        setErr(`El archivo pesa ${mb} MB. Máximo 200 MB.`);
+        return;
+      }
+      if (!/^video\/(mp4|quicktime|x-msvideo|webm)$/i.test(file.type) &&
+          !/\.(mp4|mov|webm|avi)$/i.test(file.name)) {
+        setErr('Formato no soportado. Usa mp4, mov o webm.');
+        return;
+      }
+      setUploading(true);
+      setProgress(0);
+      try {
+        const sign = await api('/upload/sign-video', { method: 'POST' });
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('api_key', sign.apiKey);
+        fd.append('timestamp', sign.timestamp);
+        fd.append('folder', sign.folder);
+        fd.append('eager', sign.eager);
+        fd.append('eager_async', 'true');
+        fd.append('resource_type', 'video');
+        fd.append('signature', sign.signature);
+
+        // Usamos XHR (no fetch) porque expone progress events para el uploader.
+        const xhr = new XMLHttpRequest();
+        const url = await new Promise((resolve, reject) => {
+          xhr.open('POST', sign.uploadUrl);
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+          };
+          xhr.onload = () => {
+            try {
+              const j = JSON.parse(xhr.responseText);
+              if (xhr.status >= 200 && xhr.status < 300) resolve(j.secure_url || j.url);
+              else reject(new Error(j?.error?.message || 'Falló el upload'));
+            } catch (e) { reject(new Error('Respuesta inválida de Cloudinary')); }
+          };
+          xhr.onerror = () => reject(new Error('Error de red al subir'));
+          xhr.send(fd);
+        });
+        onChange(url);
+      } catch (e) {
+        setErr(e.message || 'Error subiendo video');
+      } finally {
+        setUploading(false);
+        setProgress(0);
+      }
+    };
+
+    const clear = () => { onChange(''); setErr(''); };
+
+    if (value) {
+      return html`
+        <div className="video-preview" data-testid="video-preview">
+          <video src=${value} controls preload="metadata" style=${{ width: '100%', maxHeight: '360px', background: '#000', borderRadius: '8px' }} />
+          <div style=${{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
+            <span style=${{ fontSize: '12px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>${value}</span>
+            <button type="button" className="btn btn-ghost" onClick=${clear} data-testid="video-remove-btn" style=${{ fontSize: '12px', padding: '6px 12px' }}>Quitar</button>
+          </div>
+        </div>`;
+    }
+    return html`
+      <label className="photo-uploader" style=${{ minHeight: '96px' }} data-testid="video-upload-label">
+        <input type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange=${(e) => uploadFile(e.target.files?.[0])} disabled=${uploading} />
+        ${uploading
+          ? html`<div style=${{ textAlign: 'center' }}>
+              <div style=${{ fontSize: '13px', marginBottom: '6px' }}>Subiendo… ${progress}%</div>
+              <div style=${{ width: '160px', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', margin: '0 auto' }}>
+                <div style=${{ width: progress + '%', height: '100%', background: 'var(--color-primary, #0ea5e9)', transition: 'width .2s' }}></div>
+              </div>
+            </div>`
+          : html`<div>
+              <div>＋ Subir video</div>
+              <div style=${{ fontSize: '11px' }}>mp4 / mov / webm · hasta 200 MB</div>
+            </div>`}
+      </label>
+      ${err ? html`<div style=${{ color: '#dc2626', fontSize: '13px', marginTop: '8px' }} data-testid="video-upload-error">${err}</div>` : null}
     `;
   }
 

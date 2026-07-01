@@ -69,4 +69,52 @@ r.post('/sign', requireSession, (req, res) => {
   });
 });
 
+// POST /api/upload/sign-video
+// Firma para subir un video directamente a Cloudinary con resource_type=video.
+// El cliente sube directo (browser -> Cloudinary), sin pasar por nuestro backend.
+// Master Context v2.6 — carpeta /tenants/{id}/properties/videos
+r.post('/sign-video', requireSession, (req, res) => {
+  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+    return res.status(500).json({
+      error: 'cloudinary_not_configured',
+      hint: 'Setea CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el env.',
+    });
+  }
+
+  const folder = `tenants/${req.tenant.id}/properties/videos`;
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  // Eager async: genera versión mp4 optimizada (h264, 720p, faststart) para
+  // reproducción en mobile/desktop. `f_auto` deja que Cloudinary elija codec
+  // óptimo por browser (av1/vp9/mp4). Async porque videos toman tiempo.
+  const eager = 'f_auto,vc_h264,w_1280,c_limit,q_auto';
+
+  const params = {
+    eager,
+    eager_async: 'true',
+    folder,
+    resource_type: 'video',
+    timestamp: String(timestamp),
+  };
+  const toSign =
+    Object.keys(params)
+      .sort()
+      .map((k) => `${k}=${params[k]}`)
+      .join('&') + env.cloudinary.apiSecret;
+
+  const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+
+  res.json({
+    cloudName: env.cloudinary.cloudName,
+    apiKey: env.cloudinary.apiKey,
+    timestamp,
+    folder,
+    eager,
+    eagerAsync: true,
+    resourceType: 'video',
+    signature,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.cloudinary.cloudName}/video/upload`,
+  });
+});
+
 export default r;
