@@ -381,6 +381,13 @@ img { max-width: 100%; height: auto; display: block; }
 .mobile-cta .btn { flex: 1; padding: 14px 18px; font-size: 15px; }
 @media (min-width: 900px) { .mobile-cta { display: none; } }
 
+/* GHL Form embed */
+.ghl-form-embed { margin-top: 4px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid var(--color-border); }
+.ghl-form-embed iframe { display: block; width: 100%; }
+@media (max-width: 640px) {
+  .ghl-form-embed iframe { height: 720px; }
+}
+
 /* Widget WhatsApp flotante */
 .wa-fab {
   position: fixed; bottom: 80px; right: 16px;

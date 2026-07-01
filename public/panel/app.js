@@ -133,7 +133,7 @@
     ]},
     { title: 'CTA y colecciones', fields: [
       { key: 'cta_tipo', label: 'CTA de la propiedad', type: 'select', options: ['global','whatsapp','formulario','redirect'], defaultValue: 'global' },
-      { key: 'cta_valor', label: 'Valor del CTA (número, snippet o URL)', type: 'text', showIf: (s) => s.cta_tipo && s.cta_tipo !== 'global', span: 2 },
+      { key: 'cta_valor', label: 'Valor del CTA (número, snippet o URL)', type: 'cta_value', showIf: (s) => s.cta_tipo && s.cta_tipo !== 'global', span: 2 },
       { key: '_collections', label: 'Asignar a colecciones', type: 'collections', full: true },
     ]},
   ];
@@ -326,6 +326,13 @@
       case 'textarea':
         control = html`<textarea id=${field.key} className="form-textarea" rows="4" value=${value || ''} onInput=${(e) => set(field.key, e.target.value)} />`;
         break;
+      case 'cta_value':
+        // Field polimórfico: cambia su UI según state.cta_tipo. Cuando es
+        // 'formulario' muestra textarea + validación de dominio GHL + preview.
+        return html`<div className=${'form-field ' + span}>
+          ${label}
+          <${CtaValueInput} state=${state} set=${set} field=${field} />
+        </div>`;
       case 'select': {
         // Para campos requeridos sin opción vacía explícita, anteponer un
         // placeholder "— Selecciona —" para forzar elección consciente del usuario.
@@ -537,6 +544,75 @@
       </div>
       ${uploading > 0 ? html`<div className="photo-uploading">Subiendo ${uploading} foto(s)…</div>` : null}
     `;
+  }
+
+  // CtaValueInput — polimórfico según state.cta_tipo.
+  //   - formulario: <textarea> con validación live del <iframe src=...> contra
+  //     whitelist de dominios GHL + preview live.
+  //   - whatsapp:  input tel
+  //   - redirect:  input url
+  function CtaValueInput({ state, set, field }) {
+    const value = state.cta_valor || '';
+    const tipo = state.cta_tipo;
+    const validation = useMemo(() => validateGhlEmbed(value), [value]);
+
+    if (tipo === 'formulario') {
+      return html`<${Fragment}>
+        <textarea
+          id=${field.key}
+          className="form-textarea"
+          data-testid="cta-form-textarea"
+          rows="4"
+          placeholder='Pega aquí el código embed de tu formulario GHL (empieza con <iframe...)'
+          value=${value}
+          onInput=${(e) => set(field.key, e.target.value)}
+        />
+        ${value && !validation.ok ? html`<div className="form-error" data-testid="cta-form-error">
+          Solo se permiten formularios de GoHighLevel.
+          ${validation.error === 'no_iframe_src' ? ' Falta un <iframe src="…">.' : ''}
+          ${validation.error === 'host_not_allowed' ? ` Dominio "${validation.host}" no está autorizado.` : ''}
+        </div>` : null}
+        ${validation.ok ? html`<div className="cta-form-preview" data-testid="cta-form-preview">
+          <div className="cta-form-preview-title">Vista previa</div>
+          <iframe
+            src=${validation.src}
+            title="Preview formulario GHL"
+            loading="lazy"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+            style=${{ width: '100%', height: '400px', border: 0, display: 'block' }}
+          ></iframe>
+        </div>` : null}
+        <span className="form-help">Dominios válidos: *.gohighlevel.com · *.leadconnectorhq.com · *.msgsndr.com</span>
+      <//>`;
+    }
+
+    // whatsapp / redirect / otros → input plano.
+    const inputType = tipo === 'whatsapp' ? 'tel' : (tipo === 'redirect' ? 'url' : 'text');
+    const placeholder = tipo === 'whatsapp' ? '+52 998 432 4991'
+      : tipo === 'redirect' ? 'https://…'
+      : '';
+    return html`<input
+      id=${field.key}
+      type=${inputType}
+      className="form-input"
+      data-testid="cta-value-input"
+      value=${value}
+      placeholder=${placeholder}
+      onInput=${(e) => set(field.key, e.target.value)}
+    />`;
+  }
+
+  // Whitelist local (debe coincidir con server-side y portal público).
+  function validateGhlEmbed(html) {
+    if (!html || typeof html !== 'string') return { ok: false, error: 'empty' };
+    const m = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+    if (!m) return { ok: false, error: 'no_iframe_src' };
+    const src = m[1];
+    let url; try { url = new URL(src); } catch { return { ok: false, error: 'invalid_url' }; }
+    const host = url.hostname.toLowerCase();
+    const allowed = ['gohighlevel.com', 'leadconnectorhq.com', 'msgsndr.com'].some((d) => host === d || host.endsWith('.' + d));
+    if (!allowed) return { ok: false, error: 'host_not_allowed', host };
+    return { ok: true, src, host };
   }
 
   // CollectionsField — chips selección + opción "+ Crear nueva" inline.

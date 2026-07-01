@@ -15,6 +15,31 @@ import { getSupabase } from '../lib/supabase.js';
 
 const r = Router();
 
+// Dominios permitidos para el embed de formulario GHL.
+// Nota: los subdominios se aceptan (endsWith) para cubrir cualquier
+// región/instancia (`api.leadconnectorhq.com`, `link.msgsndr.com`, etc).
+const GHL_FORM_ALLOWED_HOSTS = [
+  'gohighlevel.com',
+  'leadconnectorhq.com',
+  'msgsndr.com',
+];
+
+/** Valida el snippet HTML para cta_tipo=formulario. Extrae el <iframe> con
+ *  atributo src y verifica que el host caiga bajo un dominio autorizado.
+ *  Retorna { ok, error, src }. */
+export function validateGhlFormEmbed(html) {
+  if (!html || typeof html !== 'string') return { ok: false, error: 'empty' };
+  const m = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (!m) return { ok: false, error: 'no_iframe_src' };
+  const src = m[1];
+  let url;
+  try { url = new URL(src); } catch { return { ok: false, error: 'invalid_url' }; }
+  const host = url.hostname.toLowerCase();
+  const allowed = GHL_FORM_ALLOWED_HOSTS.some((d) => host === d || host.endsWith('.' + d));
+  if (!allowed) return { ok: false, error: 'host_not_allowed', host };
+  return { ok: true, src, host };
+}
+
 // ---------------------------------------------------------------------
 // POST /api/property — crea una propiedad en GHL
 // Body: { titulo, descripcion, ... } (claves cortas; las mapeamos a fieldKeys)
@@ -26,6 +51,21 @@ r.post('/', requireSession, async (req, res) => {
     const body = req.body || {};
     const fieldIds = getFieldIds();
     const t = await getTenantWithTokens(req.tenant.id);
+
+    // Validación server-side: si cta_tipo=formulario, el snippet debe ser un
+    // <iframe> apuntando a un dominio GHL autorizado. Nunca confiar solo en
+    // la validación del frontend.
+    if (body.cta_tipo === 'formulario' && body.cta_valor) {
+      const v = validateGhlFormEmbed(body.cta_valor);
+      if (!v.ok) {
+        return res.status(400).json({
+          error: 'invalid_ghl_form_embed',
+          reason: v.error,
+          host: v.host || null,
+          hint: 'El CTA "formulario" requiere un <iframe> cuyo src apunte a un dominio GHL autorizado (*.gohighlevel.com, *.leadconnectorhq.com, *.msgsndr.com).',
+        });
+      }
+    }
 
     // Auto: slug, fecha de publicación, agente_responsable (si no vino)
     const titulo = body.titulo || 'Propiedad sin título';
@@ -235,6 +275,19 @@ r.put('/:id', requireSession, async (req, res) => {
     const body = req.body || {};
     const fieldIds = getFieldIds();
     const t = await getTenantWithTokens(req.tenant.id);
+
+    // Validación server-side idéntica al POST (nunca confiar en FE).
+    if (body.cta_tipo === 'formulario' && body.cta_valor) {
+      const v = validateGhlFormEmbed(body.cta_valor);
+      if (!v.ok) {
+        return res.status(400).json({
+          error: 'invalid_ghl_form_embed',
+          reason: v.error,
+          host: v.host || null,
+          hint: 'El CTA "formulario" requiere un <iframe> cuyo src apunte a un dominio GHL autorizado (*.gohighlevel.com, *.leadconnectorhq.com, *.msgsndr.com).',
+        });
+      }
+    }
 
     const properties = {};
     for (const [shortKey, value] of Object.entries(body)) {

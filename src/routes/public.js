@@ -561,6 +561,37 @@ function whatsappFab(brand) {
   </a>`;
 }
 
+// Dominios GHL autorizados para embed de formulario. Debe coincidir con la
+// whitelist server-side de `routes/property.js`.
+const GHL_FORM_HOSTS_PUBLIC = ['gohighlevel.com', 'leadconnectorhq.com', 'msgsndr.com'];
+
+/** Extrae el <iframe> del snippet HTML, valida su host contra la whitelist y
+ *  devuelve un HTML seguro con `sandbox` permisivo suficiente para GHL Forms.
+ *  Si el snippet no es válido devuelve '' (el caller cae a fallback). */
+function renderGhlFormEmbed(html) {
+  if (!html || typeof html !== 'string') return '';
+  const m = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (!m) return '';
+  const src = m[1];
+  let url;
+  try { url = new URL(src); } catch { return ''; }
+  const host = url.hostname.toLowerCase();
+  const allowed = GHL_FORM_HOSTS_PUBLIC.some((d) => host === d || host.endsWith('.' + d));
+  if (!allowed) return '';
+  // Re-emitimos el iframe con atributos seguros y responsive.
+  // No confiamos en atributos del snippet original (podría inyectar handlers).
+  return `<div class="ghl-form-embed">
+    <iframe
+      src="${esc(src)}"
+      title="Formulario de contacto"
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+      style="width:100%;height:600px;border:0;display:block"
+    ></iframe>
+  </div>`;
+}
+
 function renderCTA(p, agent, brand, record) {
   // Resolución por prioridad: override por propiedad > widget global
   const overrideType = p.cta_tipo;
@@ -570,7 +601,16 @@ function renderCTA(p, agent, brand, record) {
   if (overrideType === 'whatsapp' && overrideVal) {
     primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(overrideVal).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
   } else if (overrideType === 'formulario' && overrideVal) {
-    primaryHtml = `<div>${overrideVal}</div>`;
+    primaryHtml = renderGhlFormEmbed(overrideVal);
+    // Si el snippet no es válido, `renderGhlFormEmbed` devuelve '' y caemos al
+    // fallback global más abajo (widget de contacto / whatsapp).
+    if (!primaryHtml) {
+      if (agent?.whatsapp) {
+        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(agent.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar a ${esc(agent.nombre || 'el agente')}</a>`;
+      } else if (brand?.whatsapp) {
+        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
+      }
+    }
   } else if (overrideType === 'redirect' && overrideVal) {
     primaryHtml = `<a class="btn btn-block" href="${esc(overrideVal)}" target="_blank" rel="noopener">Más información</a>`;
   } else if (agent?.whatsapp) {
@@ -614,6 +654,9 @@ function renderCTA(p, agent, brand, record) {
 }
 
 function renderMobileCTA(p, agent, brand) {
+  // Cuando el CTA es un formulario embebido válido, NO mostramos el botón
+  // flotante (el iframe reemplaza el CTA — evita duplicación en mobile).
+  if (p.cta_tipo === 'formulario' && p.cta_valor && renderGhlFormEmbed(p.cta_valor)) return '';
   // Mismo CTA primario que el sidebar, pero fijo en el bottom.
   let href = '';
   let label = 'Contactar';
