@@ -89,11 +89,14 @@ r.post('/sign-video', requireSession, (req, res) => {
   // óptimo por browser (av1/vp9/mp4). Async porque videos toman tiempo.
   const eager = 'f_auto,vc_h264,w_1280,c_limit,q_auto';
 
+  // IMPORTANTE — Cloudinary NO firma `resource_type` porque es parte del PATH
+  // de la URL (`/video/upload` vs `/image/upload`), no un form field. Si lo
+  // incluimos en el string-to-sign obtenemos "Invalid Signature".
+  // Docs: https://cloudinary.com/documentation/authentication_signatures#manual_signature_generation
   const params = {
     eager,
     eager_async: 'true',
     folder,
-    resource_type: 'video',
     timestamp: String(timestamp),
   };
   const toSign =
@@ -111,7 +114,6 @@ r.post('/sign-video', requireSession, (req, res) => {
     folder,
     eager,
     eagerAsync: true,
-    resourceType: 'video',
     signature,
     uploadUrl: `https://api.cloudinary.com/v1_1/${env.cloudinary.cloudName}/video/upload`,
   });

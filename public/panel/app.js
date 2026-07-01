@@ -626,7 +626,9 @@
         fd.append('folder', sign.folder);
         fd.append('eager', sign.eager);
         fd.append('eager_async', 'true');
-        fd.append('resource_type', 'video');
+        // `resource_type` va en el PATH de la URL (/video/upload), NO en el
+        // body — si se envía como form field, Cloudinary lo mete en la firma
+        // esperada y falla con "Invalid Signature".
         fd.append('signature', sign.signature);
 
         // Usamos XHR (no fetch) porque expone progress events para el uploader.
@@ -660,26 +662,30 @@
     if (value) {
       return html`
         <div className="video-preview" data-testid="video-preview">
-          <video src=${value} controls preload="metadata" style=${{ width: '100%', maxHeight: '360px', background: '#000', borderRadius: '8px' }} />
+          <video src=${value} controls preload="metadata" style=${{ width: '100%', maxHeight: '200px', background: '#000', borderRadius: '8px', display: 'block' }} />
           <div style=${{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
             <span style=${{ fontSize: '12px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>${value}</span>
             <button type="button" className="btn btn-ghost" onClick=${clear} data-testid="video-remove-btn" style=${{ fontSize: '12px', padding: '6px 12px' }}>Quitar</button>
           </div>
         </div>`;
     }
+    // Estado vacío: dropzone compacto ~80px, similar al "+ Agregar" de fotos.
     return html`
-      <label className="photo-uploader" style=${{ minHeight: '96px' }} data-testid="video-upload-label">
+      <label className="photo-uploader video-uploader-empty" style=${{ height: '80px', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: '10px', cursor: uploading ? 'wait' : 'pointer' }} data-testid="video-upload-label">
         <input type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange=${(e) => uploadFile(e.target.files?.[0])} disabled=${uploading} />
         ${uploading
-          ? html`<div style=${{ textAlign: 'center' }}>
-              <div style=${{ fontSize: '13px', marginBottom: '6px' }}>Subiendo… ${progress}%</div>
-              <div style=${{ width: '160px', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', margin: '0 auto' }}>
+          ? html`<div style=${{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style=${{ fontSize: '13px', fontWeight: 600 }}>Subiendo… ${progress}%</div>
+              <div style=${{ width: '140px', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style=${{ width: progress + '%', height: '100%', background: 'var(--color-primary, #0ea5e9)', transition: 'width .2s' }}></div>
               </div>
             </div>`
-          : html`<div>
-              <div>＋ Subir video</div>
-              <div style=${{ fontSize: '11px' }}>mp4 / mov / webm · hasta 200 MB</div>
+          : html`<div style=${{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style=${{ fontSize: '20px', lineHeight: 1 }}>＋</span>
+              <div style=${{ textAlign: 'left' }}>
+                <div style=${{ fontSize: '13px', fontWeight: 600 }}>Subir video</div>
+                <div style=${{ fontSize: '11px', color: 'var(--color-text-muted)' }}>mp4 / mov / webm · hasta 200 MB</div>
+              </div>
             </div>`}
       </label>
       ${err ? html`<div style=${{ color: '#dc2626', fontSize: '13px', marginTop: '8px' }} data-testid="video-upload-error">${err}</div>` : null}

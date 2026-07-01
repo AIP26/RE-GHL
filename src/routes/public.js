@@ -500,9 +500,8 @@ async function handleFichaOrganica(req, res, next) {
           <div class="amenities">${amenidades.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>
         </div>` : ''}
 
-        <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap">
-          <a href="/api/pdf/ficha/${esc(req.params.id)}" class="btn btn-ghost" style="flex:1;min-width:160px">Descargar 1 página</a>
-          <a href="/api/pdf/ficha/${esc(req.params.id)}?pages=2" class="btn btn-ghost" style="flex:1;min-width:160px">Descargar 2 páginas</a>
+        <div style="margin-top:24px">
+          <a href="/api/pdf/ficha/${esc(req.params.id)}?pages=2" class="btn btn-ghost" style="width:100%" data-testid="ficha-pdf-download-btn">Descargar ficha PDF</a>
         </div>
 
         <p class="organic-disclaimer">Ficha técnica · Información sujeta a verificación</p>
@@ -715,20 +714,16 @@ function renderCTA(p, agent, brand, record) {
     primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
   }
 
-  // Selector de versión del PDF.
-  // En el portal del agente NO requerimos sesión — generamos PDFs públicos
-  // vía /api/pdf/ficha/:id (la ficha la creamos al vuelo si no existe).
+  // Botón único para descargar el PDF de la propiedad.
+  // Preferimos la versión "con-agente · 2 páginas" desde el portal del agente
+  // — es el fact-sheet más completo, útil para compartir con leads.
+  // (En el panel `Mis Listings` el agente elige entre las 4 variantes; aquí
+  //  simplificamos para que el visitante público tenga UN solo call-to-action.)
   const recId = record?.id || '';
   const pdfPicker = recId ? `
-    <div class="pdf-picker" style="margin-top:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Ficha PDF</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-1pag" style="font-size:12px;padding:8px 6px">Con datos · 1 pág</a>
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="font-size:12px;padding:8px 6px">Con datos · 2 págs</a>
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-1pag" style="font-size:12px;padding:8px 6px">Orgánico · 1 pág</a>
-        <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=sin-agente-2pag" style="font-size:12px;padding:8px 6px">Orgánico · 2 págs</a>
-      </div>
-    </div>` : '';
+    <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="margin-top:10px" data-testid="portal-pdf-download-btn">
+      Descargar ficha PDF
+    </a>` : '';
 
   const agentBlock = agent ? `
     <div class="agent-card-top">
