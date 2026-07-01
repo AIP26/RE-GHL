@@ -13,15 +13,56 @@
   // -------------------------------------------------------------------
   const API = '/api';
   let _token = null;
+  let _reSsoInFlight = null;   // dedupe: si dos requests entran en 401 a la vez, sólo un fetch SSO
   function setToken(t) { _token = t; }
+
+  /** Re-emite el session token pidiendo /auth/sso con los params que aún están
+   *  en la URL del iframe (GHL nunca los quita). Devuelve true si logró refrescar,
+   *  false si no hay params o el SSO respondió con error. */
+  async function reAuthFromUrl() {
+    if (_reSsoInFlight) return _reSsoInFlight;
+    _reSsoInFlight = (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const locationId = params.get('locationId');
+        const userId = params.get('userId');
+        if (!locationId || !userId) return false;
+        const r = await fetch(`${API}/auth/sso?locationId=${encodeURIComponent(locationId)}&userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return false;
+        const j = await r.json();
+        if (!j.token) return false;
+        setToken(j.token);
+        return true;
+      } catch { return false; }
+      finally { _reSsoInFlight = null; }
+    })();
+    return _reSsoInFlight;
+  }
+
   async function api(path, opts = {}) {
-    const headers = { 'Accept': 'application/json', ...(opts.headers || {}) };
-    if (_token) headers['Authorization'] = 'Bearer ' + _token;
-    if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(opts.body);
+    const doFetch = async () => {
+      const headers = { 'Accept': 'application/json', ...(opts.headers || {}) };
+      if (_token) headers['Authorization'] = 'Bearer ' + _token;
+      let body = opts.body;
+      if (body && typeof body !== 'string' && !(body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(body);
+      }
+      return fetch(API + path, { ...opts, headers, body });
+    };
+
+    let res = await doFetch();
+
+    // Session expiró (JWT 8h) → intenta re-SSO transparente UNA vez y reintenta.
+    // No re-intentamos el propio /auth/sso para evitar loops.
+    if (res.status === 401 && !opts._retried && path !== '/auth/sso') {
+      const ok = await reAuthFromUrl();
+      if (ok) {
+        opts._retried = true;
+        res = await doFetch();
+      }
     }
-    const res = await fetch(API + path, { ...opts, headers });
+
     if (!res.ok) {
       let err;
       try { err = await res.json(); } catch { err = { error: 'http_' + res.status }; }
