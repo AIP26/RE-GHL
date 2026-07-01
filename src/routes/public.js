@@ -62,6 +62,10 @@ r.get('/:id', (req, res, next) => {
 // ---------------------------------------------------------------------
 r.get('/', async (req, res, next) => {
   try {
+    // El subdominio `ficha.<APP_DOMAIN>` es puro slug-router — no tiene home.
+    // Sin este short-circuit el handler seguiría con tenantId=undefined y
+    // Supabase respondería 500 con "invalid input syntax for type uuid".
+    if (req.isFichaHost) return notFound(res, null, 'Ruta no válida en este dominio.');
     const tenantId = req.portalTenantId;
     const [brand, records, agents] = await Promise.all([
       loadBrand(tenantId),
