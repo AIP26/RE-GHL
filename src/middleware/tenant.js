@@ -7,7 +7,15 @@
 // `?preview=<tenant_id>` (sólo en GET, sólo si está activo). Esto permite
 // probar el portal de un tenant desde listings.mktscaled.com/?preview=...
 // antes de que el CNAME real esté configurado.
+//
+// EXCEPCIÓN: `ficha.<APP_DOMAIN>` es un dominio compartido de la plataforma
+// (no de un cliente). Las URLs orgánicas viven ahí: ficha.mktscaled.com/L4B9TP.
+// El tenant se resuelve DENTRO del handler leyendo la tabla `fichas_url` por
+// slug, así que el middleware NO debe hacer lookup en `dominios` (ese subdominio
+// nunca estará ahí) ni bloquear con "Portal no encontrado". Marcamos con
+// `req.isFichaHost = true` para que las rutas puedan branchear.
 import { getSupabase } from '../lib/supabase.js';
+import { env } from '../config/env.js';
 
 const HOSTS_LOCAL = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
 
@@ -21,6 +29,16 @@ function normalizeHost(h) {
 export async function resolveTenantByHost(req, _res, next) {
   const sb = getSupabase();
   const host = normalizeHost(req.headers.host);
+
+  // 0) Excepción: subdominio compartido de fichas orgánicas.
+  // ficha.<APP_DOMAIN> — nunca hay que buscarlo en `dominios`; el handler
+  // resuelve tenant desde `fichas_url` por slug.
+  const appDomain = (env.appDomain || '').toLowerCase();
+  if (appDomain && host === `ficha.${appDomain}`) {
+    req.isFichaHost = true;
+    req.portalHost = host;
+    return next();
+  }
 
   // 1) Lookup por subdominio exacto en la tabla dominios.
   if (host && !HOSTS_LOCAL.has(host)) {

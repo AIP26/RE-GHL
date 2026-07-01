@@ -27,7 +27,11 @@ import { getSupabase } from '../lib/supabase.js';
 const r = Router();
 
 // Guard: todas las rutas públicas requieren tenant resuelto por el middleware.
+// EXCEPCIÓN: el subdominio `ficha.<APP_DOMAIN>` NO tiene tenant a nivel host —
+// el tenant se resuelve dentro del handler por el slug en la URL (fichas_url).
+// Ese subdominio sólo expone la ruta orgánica (GET /:id) y su PDF.
 function requirePortalTenant(req, res, next) {
+  if (req.isFichaHost) return next();
   if (!req.portalTenantId) {
     return res.status(404).type('html').send(
       `<!doctype html><html><head><meta charset="utf-8"><title>Portal no encontrado</title></head>
@@ -41,6 +45,17 @@ function requirePortalTenant(req, res, next) {
   next();
 }
 r.use(requirePortalTenant);
+
+// ---------------------------------------------------------------------
+// FICHA SUBDOMAIN — `ficha.<APP_DOMAIN>/<slug>` es la URL orgánica compartida
+// entre TODOS los tenants (sin branding, no-index). Delegamos al mismo handler
+// que /ficha/:id. Sólo aplica cuando el middleware marcó isFichaHost=true;
+// en cualquier otro host, cae al next() y el resto del router sigue normal.
+// ---------------------------------------------------------------------
+r.get('/:id', (req, res, next) => {
+  if (!req.isFichaHost) return next();
+  return handleFichaOrganica(req, res, next);
+});
 
 // ---------------------------------------------------------------------
 // 1) HOME
@@ -448,7 +463,9 @@ r.get('/buscar', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // 5) URL ORGÁNICA
 // ---------------------------------------------------------------------
-r.get('/ficha/:id', async (req, res, next) => {
+r.get('/ficha/:id', (req, res, next) => handleFichaOrganica(req, res, next));
+
+async function handleFichaOrganica(req, res, next) {
   try {
     const sb = getSupabase();
     const { data: ficha } = await sb
@@ -523,7 +540,7 @@ r.get('/ficha/:id', async (req, res, next) => {
       '</body></html>';
     res.type('html').send(html);
   } catch (err) { next(err); }
-});
+}
 
 // ---------------------------------------------------------------------
 // Helpers locales del módulo
