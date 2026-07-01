@@ -500,6 +500,12 @@ async function handleFichaOrganica(req, res, next) {
           <div class="amenities">${amenidades.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>
         </div>` : ''}
 
+        ${p.latitud && p.longitud && !p.ocultar_direccion_exacta ? `<div style="margin-top:22px">
+          <div style="font-weight:700;margin-bottom:8px">Ubicación</div>
+          <iframe class="map-frame" loading="lazy" src="${esc(mapsEmbedHref(p.latitud, p.longitud))}" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          <div style="margin-top:8px"><a href="${esc(mapsViewHref(p.latitud, p.longitud))}" target="_blank" rel="noopener" class="btn btn-ghost">Ver en Google Maps</a></div>
+        </div>` : ''}
+
         <div style="margin-top:24px">
           <a href="/api/pdf/ficha/${esc(req.params.id)}?pages=2" class="btn btn-ghost" style="width:100%" data-testid="ficha-pdf-download-btn">Descargar ficha PDF</a>
         </div>
@@ -542,18 +548,15 @@ function renderGalleryHtml(photoUrls, titulo) {
   const t = esc(titulo || 'Propiedad');
   const hero = photoUrls[0];
   const thumbs = photoUrls.slice(1);
-  const MAX_THUMBS_BEFORE_OVERLAY = 6;
-  const extraCount = thumbs.length - MAX_THUMBS_BEFORE_OVERLAY;
 
+  // NOTA: se removió el overlay "+ N fotos" sobre el 6º thumbnail (rev. Bloque 7).
+  // La fila ya es scrolleable horizontalmente, el overlay interrumpía la UX;
+  // el visitante descubre las fotos deslizando o haciendo click en cualquier
+  // thumb para abrir el lightbox y navegar de ahí.
   const thumbsHtml = thumbs.map((url, i) => {
     const photoIdx = i + 1;
-    const isOverlayThumb = extraCount > 0 && i === MAX_THUMBS_BEFORE_OVERLAY - 1;
-    const overlay = isOverlayThumb
-      ? `<div class="thumb-overlay">+ ${extraCount} foto${extraCount === 1 ? '' : 's'}</div>`
-      : '';
-    return `<a class="thumb${isOverlayThumb ? ' has-overlay' : ''}" href="javascript:void(0)" data-idx="${photoIdx}" aria-label="${t} - foto ${photoIdx + 1}">
+    return `<a class="thumb" href="javascript:void(0)" data-idx="${photoIdx}" aria-label="${t} - foto ${photoIdx + 1}">
       <img src="${esc(url)}" alt="${t} - foto ${photoIdx + 1}" loading="lazy" />
-      ${overlay}
     </a>`;
   }).join('');
 

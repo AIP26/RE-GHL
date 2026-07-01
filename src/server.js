@@ -38,6 +38,23 @@ const app = express();
 // Trust proxy (Railway, Cloudflare, etc.) para Host / IP / HTTPS correctos.
 app.set('trust proxy', true);
 
+// HTTPS enforcement — Railway y Cloudflare terminan TLS y nos pasan el request
+// vía HTTP con `x-forwarded-proto: http` cuando el cliente vino sin https.
+// Redirigimos 301 al equivalente HTTPS para eliminar el warning "No seguro"
+// y forzar upgrade permanente en el navegador. Solo activo en producción — en
+// desarrollo local no hay proxy TLS y el header estaría ausente igualmente.
+// Excepción: health checks (Railway los hace en HTTP interno sobre el pod) —
+// se dejan pasar sin redirect para no romper el orchestrator.
+app.use((req, res, next) => {
+  if (env.nodeEnv !== 'production') return next();
+  if (req.path === '/api/health' || req.path === '/health') return next();
+  const proto = req.headers['x-forwarded-proto'];
+  if (proto && proto.split(',')[0].trim() === 'http') {
+    return res.redirect(301, 'https://' + req.headers.host + req.url);
+  }
+  next();
+});
+
 // Seguridad + perf
 app.use(
   helmet({

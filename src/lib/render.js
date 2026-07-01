@@ -365,15 +365,8 @@ img { max-width: 100%; height: auto; display: block; }
 }
 .gallery-v2 .thumb:hover { opacity: .85; }
 .gallery-v2 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gallery-v2 .thumb .thumb-overlay {
-  position: absolute; inset: 0; background: rgba(15,23,42,.65); color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 13px; text-align: center; padding: 4px;
-  pointer-events: none; letter-spacing: .01em;
-}
 @media (min-width: 768px) {
   .gallery-v2 .thumb { height: 80px; width: 120px; }
-  .gallery-v2 .thumb .thumb-overlay { font-size: 14px; }
 }
 
 .detail-grid {

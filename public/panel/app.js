@@ -2202,8 +2202,13 @@
       } catch (e) { toast(e.detail?.message || e.message, 'error'); }
     };
 
-    const portalHost = ctx.portal?.subdominio || `localhost:8001/?preview=${ctx.tenant.id}`;
-    const portalBase = ctx.portal?.activo ? `https://${ctx.portal.subdominio}` : `http://${portalHost}`;
+    // Base URL para links "Ver en portal" desde Mis Listings. Cuando el portal
+    // del cliente no está activo, caemos al preview URL en el MISMO host que
+    // está sirviendo el panel — usar `location.origin` es siempre HTTPS en
+    // producción y evita mixed-content warnings del browser.
+    const portalBase = ctx.portal?.activo
+      ? `https://${ctx.portal.subdominio}`
+      : `${window.location.origin}/?preview=${ctx.tenant.id}`;
 
     return html`<${Fragment}>
       <div className="page-header">
