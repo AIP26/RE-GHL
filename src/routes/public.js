@@ -249,13 +249,9 @@ r.get('/p/:slug', async (req, res, next) => {
             <span>${esc(p.colonia || p.ciudad || '')}</span>
           </div>
 
-          <div class="detail-gallery" id="gallery">
-            ${(photoUrls.slice(0, 5)).map((url, i) => `
-              <a href="javascript:void(0)" data-idx="${i}">
-                <img src="${esc(url)}" alt="${esc(p.titulo || '')} - foto ${i + 1}" loading="${i === 0 ? 'eager' : 'lazy'}" />
-              </a>`).join('')}
+          <div class="detail-gallery-wrap" id="gallery">
+            ${renderGalleryHtml(photoUrls, p.titulo || 'Propiedad')}
           </div>
-          ${photos.length > 5 ? `<div style="text-align:center;margin-top:10px"><a href="javascript:void(0)" onclick="window.openLightbox(0)" style="color:var(--color-primary);font-weight:600">Ver las ${photos.length} fotos</a></div>` : ''}
 
           <div class="detail-grid" style="margin-top:24px">
             <div>
@@ -305,36 +301,7 @@ r.get('/p/:slug', async (req, res, next) => {
       ${renderMobileCTA(p, agent, brand)}
       ${whatsappFab(brand)}
 
-      <div class="lightbox" id="lightbox" onclick="if(event.target.id==='lightbox')window.closeLightbox()">
-        <button class="close" onclick="window.closeLightbox()" aria-label="Cerrar">×</button>
-        <button class="nav prev" onclick="window.navLightbox(-1)" aria-label="Anterior">‹</button>
-        <button class="nav next" onclick="window.navLightbox(1)" aria-label="Siguiente">›</button>
-        <span class="counter" id="lb-counter"></span>
-        <img id="lb-img" alt="" />
-      </div>
-
-      <script>
-        (function(){
-          var fulls = ${JSON.stringify(photosFull)};
-          var idx = 0;
-          window.openLightbox = function(i){ idx = i || 0; show(); document.getElementById('lightbox').classList.add('open'); };
-          window.closeLightbox = function(){ document.getElementById('lightbox').classList.remove('open'); };
-          window.navLightbox = function(d){ idx = (idx + d + fulls.length) % fulls.length; show(); };
-          function show(){
-            document.getElementById('lb-img').src = fulls[idx];
-            document.getElementById('lb-counter').textContent = (idx+1)+' / '+fulls.length;
-          }
-          document.querySelectorAll('#gallery a').forEach(function(a){
-            a.addEventListener('click', function(){ window.openLightbox(Number(a.getAttribute('data-idx')) || 0); });
-          });
-          document.addEventListener('keydown', function(e){
-            if (!document.getElementById('lightbox').classList.contains('open')) return;
-            if (e.key === 'Escape') window.closeLightbox();
-            if (e.key === 'ArrowLeft') window.navLightbox(-1);
-            if (e.key === 'ArrowRight') window.navLightbox(1);
-          });
-        })();
-      </script>` +
+      ${renderLightbox(photosFull)}` +
       footer(brand);
     res.type('html').send(html);
   } catch (err) { next(err); }
@@ -492,7 +459,8 @@ async function handleFichaOrganica(req, res, next) {
     sb.from('fichas_url').update({ vistas: (ficha.vistas || 0) + 1 }).eq('id', req.params.id).then(() => {});
 
     const photos = parsePhotos(p.fotos_urls);
-    const photoUrls = photos.map((u) => cld(u, 'c_limit,w_1280,q_auto,f_auto'));
+    const photoUrls = photos.map((u) => cld(u, 'c_fill,w_1280,h_960,q_auto,f_auto'));
+    const photosFull = photos.map((u) => cld(u, 'c_limit,w_2000,q_auto,f_auto'));
     const pricesOrg = getDisplayPrices(p);
     const usd = pricesOrg.principal?.formatted || '';
     const mxn = pricesOrg.secundario?.formatted || '';
@@ -508,10 +476,8 @@ async function handleFichaOrganica(req, res, next) {
         noindex: true,
       }) +
       `<div class="organic-wrap">
-        <div style="background:#f8fafc;border-radius:14px;overflow:hidden">
-          <div style="display:grid;gap:4px;grid-template-columns:1fr">
-            ${photoUrls.slice(0, 6).map((u) => `<img src="${esc(u)}" alt="" loading="lazy" style="width:100%;display:block" />`).join('')}
-          </div>
+        <div id="gallery">
+          ${renderGalleryHtml(photoUrls, p.titulo || 'Propiedad')}
         </div>
 
         <h1 style="font-size:24px;font-weight:800;margin:22px 0 4px;letter-spacing:-.01em">${esc(p.titulo || 'Propiedad')}</h1>
@@ -540,7 +506,8 @@ async function handleFichaOrganica(req, res, next) {
         </div>
 
         <p class="organic-disclaimer">Ficha técnica · Información sujeta a verificación</p>
-      </div>` +
+      </div>
+      ${renderLightbox(photosFull)}` +
       '</body></html>';
     res.type('html').send(html);
   } catch (err) { next(err); }
@@ -564,6 +531,84 @@ function notFound(res, brand, msg) {
 function statCell(label, value, icon) {
   return `<div class="stat-cell"><div class="l">${icon} ${esc(label)}</div><div class="v">${esc(value)}</div></div>`;
 }
+
+/** Galería "hero + thumbnails" estilo portal premium.
+ *  - Hero (photo 0): 500px desktop / 280px mobile, click → lightbox idx 0.
+ *  - Thumbnails (photos 1..N-1): fila horizontal scrolleable, altura 80/64px.
+ *  - Si hay >6 thumbnails, overlay "+ N fotos" sobre el 6º thumbnail
+ *    (photos[6]) — click abre lightbox en foto 6.
+ *  Depende del script inyectado por renderLightbox() para el binding. */
+function renderGalleryHtml(photoUrls, titulo) {
+  if (!photoUrls || !photoUrls.length) return '';
+  const t = esc(titulo || 'Propiedad');
+  const hero = photoUrls[0];
+  const thumbs = photoUrls.slice(1);
+  const MAX_THUMBS_BEFORE_OVERLAY = 6;
+  const extraCount = thumbs.length - MAX_THUMBS_BEFORE_OVERLAY;
+
+  const thumbsHtml = thumbs.map((url, i) => {
+    const photoIdx = i + 1;
+    const isOverlayThumb = extraCount > 0 && i === MAX_THUMBS_BEFORE_OVERLAY - 1;
+    const overlay = isOverlayThumb
+      ? `<div class="thumb-overlay">+ ${extraCount} foto${extraCount === 1 ? '' : 's'}</div>`
+      : '';
+    return `<a class="thumb${isOverlayThumb ? ' has-overlay' : ''}" href="javascript:void(0)" data-idx="${photoIdx}" aria-label="${t} - foto ${photoIdx + 1}">
+      <img src="${esc(url)}" alt="${t} - foto ${photoIdx + 1}" loading="lazy" />
+      ${overlay}
+    </a>`;
+  }).join('');
+
+  return `<div class="gallery-v2">
+    <a class="g-hero" href="javascript:void(0)" data-idx="0" aria-label="${t} - foto 1">
+      <img src="${esc(hero)}" alt="${t} - foto 1" loading="eager" />
+    </a>
+    ${thumbs.length ? `<div class="thumbs" role="list">${thumbsHtml}</div>` : ''}
+  </div>`;
+}
+
+/** Lightbox + script de binding. Escanea #gallery [data-idx] al load.
+ *  Teclado (Esc, ←, →), click, y swipe horizontal en mobile. */
+function renderLightbox(photosFull) {
+  const fulls = JSON.stringify(photosFull || []);
+  return `<div class="lightbox" id="lightbox" onclick="if(event.target.id==='lightbox')window.closeLightbox()">
+      <button class="close" onclick="window.closeLightbox()" aria-label="Cerrar">×</button>
+      <button class="nav prev" onclick="window.navLightbox(-1)" aria-label="Anterior">‹</button>
+      <button class="nav next" onclick="window.navLightbox(1)" aria-label="Siguiente">›</button>
+      <span class="counter" id="lb-counter"></span>
+      <img id="lb-img" alt="" />
+    </div>
+    <script>(function(){
+      var fulls = ${fulls};
+      if (!fulls.length) return;
+      var idx = 0;
+      var lb = document.getElementById('lightbox');
+      var img = document.getElementById('lb-img');
+      var counter = document.getElementById('lb-counter');
+      function show(){ img.src = fulls[idx]; counter.textContent = (idx+1)+' / '+fulls.length; }
+      window.openLightbox = function(i){ idx = ((i|0) % fulls.length + fulls.length) % fulls.length; show(); lb.classList.add('open'); document.body.style.overflow='hidden'; };
+      window.closeLightbox = function(){ lb.classList.remove('open'); document.body.style.overflow=''; };
+      window.navLightbox = function(d){ idx = (idx + d + fulls.length) % fulls.length; show(); };
+      document.querySelectorAll('#gallery [data-idx]').forEach(function(a){
+        a.addEventListener('click', function(e){ e.preventDefault(); window.openLightbox(Number(a.getAttribute('data-idx')) || 0); });
+      });
+      document.addEventListener('keydown', function(e){
+        if (!lb.classList.contains('open')) return;
+        if (e.key === 'Escape') window.closeLightbox();
+        else if (e.key === 'ArrowLeft') window.navLightbox(-1);
+        else if (e.key === 'ArrowRight') window.navLightbox(1);
+      });
+      var tx = 0, ty = 0, tracking = false;
+      lb.addEventListener('touchstart', function(e){ if(!e.touches[0]) return; tx = e.touches[0].clientX; ty = e.touches[0].clientY; tracking = true; }, { passive: true });
+      lb.addEventListener('touchend', function(e){
+        if (!tracking || !e.changedTouches[0]) return;
+        var dx = e.changedTouches[0].clientX - tx;
+        var dy = e.changedTouches[0].clientY - ty;
+        tracking = false;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) window.navLightbox(dx < 0 ? 1 : -1);
+      }, { passive: true });
+    })();</script>`;
+}
+
 
 function ytEmbed(url) {
   const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?\s]+)/);

@@ -315,6 +315,7 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* Detail page */
+/* Legacy grid-gallery — mantenido por compatibilidad, deprecated. */
 .detail-gallery {
   display: grid; gap: 6px;
   grid-template-columns: 1fr;
@@ -332,6 +333,48 @@ img { max-width: 100%; height: auto; display: block; }
 }
 @media (min-width: 768px) { .detail-gallery a { aspect-ratio: auto; height: 100%; } }
 .detail-gallery img { width: 100%; height: 100%; object-fit: cover; }
+
+/* --- Gallery v2 (BLOQUE 7) — hero + thumbnails horizontales --- */
+.gallery-v2 { display: block; }
+.gallery-v2 .g-hero {
+  display: block; width: 100%; height: 280px; overflow: hidden;
+  border-radius: var(--radius); background: var(--color-muted); cursor: zoom-in;
+  position: relative;
+}
+.gallery-v2 .g-hero img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .4s ease;
+}
+.gallery-v2 .g-hero:hover img { transform: scale(1.02); }
+@media (min-width: 768px) { .gallery-v2 .g-hero { height: 500px; } }
+
+.gallery-v2 .thumbs {
+  display: flex; gap: 6px; margin-top: 6px;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 2px; /* espacio para scrollbar en desktop */
+}
+.gallery-v2 .thumbs::-webkit-scrollbar { height: 4px; }
+.gallery-v2 .thumbs::-webkit-scrollbar-thumb { background: rgba(0,0,0,.2); border-radius: 2px; }
+.gallery-v2 .thumb {
+  position: relative; flex: 0 0 auto;
+  height: 64px; width: 96px; overflow: hidden; border-radius: 6px;
+  background: var(--color-muted); cursor: pointer; scroll-snap-align: start;
+  transition: opacity .2s ease;
+}
+.gallery-v2 .thumb:hover { opacity: .85; }
+.gallery-v2 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-v2 .thumb .thumb-overlay {
+  position: absolute; inset: 0; background: rgba(15,23,42,.65); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; text-align: center; padding: 4px;
+  pointer-events: none; letter-spacing: .01em;
+}
+@media (min-width: 768px) {
+  .gallery-v2 .thumb { height: 80px; width: 120px; }
+  .gallery-v2 .thumb .thumb-overlay { font-size: 14px; }
+}
 
 .detail-grid {
   display: grid; gap: 24px;
