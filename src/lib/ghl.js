@@ -245,11 +245,20 @@ export async function getObjectRecord(accessToken, fullObjectKey, recordId, loca
   return data?.record || data;
 }
 
-/** PUT /objects/{schemaKey}/records/{id} */
+/** PUT /objects/{schemaKey}/records/{id}
+ *  IMPORTANTE: GHL exige `locationId` como **query param** en PUT (no en body)
+ *  desde un cambio de API en feb-2026. Si se pasa sólo en body devuelve 422
+ *  con "locationId must be a string / should not be empty". Para retro-compat
+ *  aceptamos el `locationId` en el payload y lo movemos a query.
+ */
 export async function updateObjectRecord(accessToken, fullObjectKey, recordId, payload) {
+  const locationId = payload?.locationId;
+  const body = { ...payload };
+  delete body.locationId; // no se manda en body para evitar conflicto
   const { data } = await ghlClient(accessToken).put(
     `/objects/${encodeURIComponent(fullObjectKey)}/records/${recordId}`,
-    payload
+    body,
+    { params: locationId ? { locationId } : {} }
   );
   return data?.record || data;
 }

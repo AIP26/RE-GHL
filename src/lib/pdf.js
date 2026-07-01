@@ -20,7 +20,7 @@
 //   - Fotos clickeables: con-agente → portal del agente · sin-agente → URL orgánica
 import PDFDocument from 'pdfkit';
 import axios from 'axios';
-import { parsePhotos } from './render.js';
+import { parsePhotos, getDisplayPrices } from './render.js';
 
 // A4 (595.28 x 841.89) con margen consistente
 const PAGE_MARGIN = 28;
@@ -129,11 +129,9 @@ function operationLabel(op) {
 
 /** Línea de precio en el bloque lateral (ej. "RENTA $7,000 MENSUAL"). */
 function priceBlockText(p, opKind) {
-  if (p.precio_a_consultar) return ['PRECIO', 'A CONSULTAR'];
-  const usd = p.precio_usd ? fmtPrice(p.precio_usd, 'USD') : '';
-  const mxn = p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
-  const principal = mxn || usd;
-  if (!principal) return ['PRECIO', 'A CONSULTAR'];
+  const prices = getDisplayPrices(p);
+  const principal = prices.principal?.formatted || '';
+  if (!principal || principal === 'Consultar precio') return ['PRECIO', 'A CONSULTAR'];
   if (opKind === 'renta') return ['RENTA', principal, 'MENSUAL'];
   return ['VENTA', principal, ''];
 }
@@ -687,12 +685,14 @@ function drawBullet(doc, x, y, text, width, color) {
     .text(text, x + 12, y, { width: width - 14, lineBreak: false, ellipsis: true });
 }
 
-/** Línea de precio destacada (sólo el monto, sin etiqueta). */
+/** Línea de precio destacada (sólo el monto, sin etiqueta).
+ *  Usa el helper centralizado: prefiere los nuevos campos
+ *  precio_principal/moneda_principal, hace fallback al legacy. */
 function priceMain(p) {
-  if (p.precio_a_consultar) return 'A CONSULTAR';
-  const usd = p.precio_usd ? fmtPrice(p.precio_usd, 'USD') : '';
-  const mxn = p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
-  return mxn || usd || 'A CONSULTAR';
+  const prices = getDisplayPrices(p);
+  const text = prices.principal?.formatted;
+  if (!text || text === 'Consultar precio') return 'A CONSULTAR';
+  return text;
 }
 
 /** Viñetas fijas del bloque lateral según operación (4 ítems). */

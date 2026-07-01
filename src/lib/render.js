@@ -33,6 +33,61 @@ export function fmtPrice(n, currency = 'USD') {
   }).format(num);
 }
 
+/** Resuelve qué precios mostrar para una propiedad.
+ *
+ *  Orden de prioridad:
+ *    1) Campos nuevos `precio_principal` + `moneda_principal`
+ *       (con `precio_secundario` + `moneda_secundaria` opcionales).
+ *    2) FALLBACK para propiedades antiguas NUNCA migradas:
+ *       `precio_usd` → USD principal, `precio_mxn` → MXN secundario.
+ *
+ *  Devuelve `{ principal, secundario }` donde cada uno es
+ *  `{ amount, currency, formatted }` o `null` si no aplica.
+ *
+ *  `precio_a_consultar`: devuelve formatted="Consultar precio" en principal.
+ */
+export function getDisplayPrices(p) {
+  if (!p) return { principal: null, secundario: null };
+  if (p.precio_a_consultar) {
+    return { principal: { amount: null, currency: null, formatted: 'Consultar precio' }, secundario: null };
+  }
+
+  // 1) Campos nuevos
+  if (p.precio_principal != null && p.precio_principal !== '' && p.moneda_principal) {
+    const principal = {
+      amount: Number(p.precio_principal),
+      currency: String(p.moneda_principal).toUpperCase(),
+      formatted: fmtPrice(p.precio_principal, String(p.moneda_principal).toUpperCase()),
+    };
+    let secundario = null;
+    if (p.precio_secundario != null && p.precio_secundario !== '' && p.moneda_secundaria) {
+      secundario = {
+        amount: Number(p.precio_secundario),
+        currency: String(p.moneda_secundaria).toUpperCase(),
+        formatted: fmtPrice(p.precio_secundario, String(p.moneda_secundaria).toUpperCase()),
+      };
+    }
+    return { principal, secundario };
+  }
+
+  // 2) Fallback legacy
+  if (p.precio_usd != null && p.precio_usd !== '') {
+    const principal = { amount: Number(p.precio_usd), currency: 'USD', formatted: fmtPrice(p.precio_usd, 'USD') };
+    const secundario = (p.precio_mxn != null && p.precio_mxn !== '')
+      ? { amount: Number(p.precio_mxn), currency: 'MXN', formatted: fmtPrice(p.precio_mxn, 'MXN') }
+      : null;
+    return { principal, secundario };
+  }
+  if (p.precio_mxn != null && p.precio_mxn !== '') {
+    return {
+      principal: { amount: Number(p.precio_mxn), currency: 'MXN', formatted: fmtPrice(p.precio_mxn, 'MXN') },
+      secundario: null,
+    };
+  }
+
+  return { principal: null, secundario: null };
+}
+
 /** URL absoluta del portal (https + subdominio). */
 export function portalUrl(brand, pathname = '/') {
   const host = brand?.subdominio || 'listings.mktscaled.com';
@@ -443,8 +498,9 @@ export function propertyCard(record) {
   const hero = photos[0] ? cld(photos[0], 'c_fill,w_640,h_480,q_auto,f_auto') : '';
   const tag = p.etiqueta && p.etiqueta !== '' ? p.etiqueta : null;
   const slug = p.slug_url || record.id;
-  const usd = p.precio_a_consultar ? 'Consultar precio' : fmtPrice(p.precio_usd, 'USD');
-  const mxn = !p.precio_a_consultar && p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
+  const prices = getDisplayPrices(p);
+  const principalText = prices.principal?.formatted || '';
+  const secundarioText = prices.secundario?.formatted || '';
   return `
 <article class="card">
   <a class="cover-link" href="/p/${esc(slug)}">
@@ -454,8 +510,8 @@ export function propertyCard(record) {
     </div>
   </a>
   <div class="body">
-    <div class="price">${esc(usd)}</div>
-    ${mxn ? `<div class="price-mxn">${esc(mxn)}</div>` : ''}
+    <div class="price">${esc(principalText)}</div>
+    ${secundarioText ? `<div class="price-mxn">${esc(secundarioText)}</div>` : ''}
     <h3 class="title"><a href="/p/${esc(slug)}" style="color:inherit">${esc(p.titulo || 'Propiedad')}</a></h3>
     <div class="loc">${esc([p.colonia, p.ciudad].filter(Boolean).join(', '))}</div>
     <div class="stats">

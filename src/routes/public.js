@@ -19,6 +19,7 @@ import {
   esc, fmtPrice, portalUrl, parsePhotos, cld,
   mapsEmbedHref, mapsViewHref,
   head, footer, brandHeader, propertyCard,
+  getDisplayPrices,
   ICON_BED, ICON_BATH, ICON_AREA, ICON_CAR,
 } from '../lib/render.js';
 import { getSupabase } from '../lib/supabase.js';
@@ -196,8 +197,9 @@ r.get('/p/:slug', async (req, res, next) => {
     const photosFull = photos.map((u) => cld(u, 'c_limit,w_2000,q_auto,f_auto'));
     const heroPhoto = photoUrls[0];
 
-    const usd = p.precio_a_consultar ? 'Consultar precio' : fmtPrice(p.precio_usd, 'USD');
-    const mxn = !p.precio_a_consultar && p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
+    const prices = getDisplayPrices(p);
+    const usd = prices.principal?.formatted || '';
+    const mxn = prices.secundario?.formatted || '';
 
     const agent = agents[p.agente_responsable];
 
@@ -464,8 +466,9 @@ r.get('/ficha/:id', async (req, res, next) => {
 
     const photos = parsePhotos(p.fotos_urls);
     const photoUrls = photos.map((u) => cld(u, 'c_limit,w_1280,q_auto,f_auto'));
-    const usd = p.precio_a_consultar ? 'Consultar precio' : fmtPrice(p.precio_usd, 'USD');
-    const mxn = !p.precio_a_consultar && p.precio_mxn ? fmtPrice(p.precio_mxn, 'MXN') : '';
+    const pricesOrg = getDisplayPrices(p);
+    const usd = pricesOrg.principal?.formatted || '';
+    const mxn = pricesOrg.secundario?.formatted || '';
     const amenidades = (p.amenidades || '').split(',').map((s) => s.trim()).filter(Boolean);
 
     // SEO orgánica: noindex (no queremos competir con el portal del agente)

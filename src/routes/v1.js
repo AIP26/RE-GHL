@@ -68,6 +68,12 @@ function shapeProperty(record) {
     etiqueta: p.etiqueta || null,
     precio_usd: p.precio_usd != null ? Number(p.precio_usd) : null,
     precio_mxn: p.precio_mxn != null ? Number(p.precio_mxn) : null,
+    // Campos nuevos canónicos (USD/MXN/CAD). Si una propiedad usa CAD,
+    // `precio_usd`/`precio_mxn` serán null y aquí estará el monto real.
+    precio_principal: p.precio_principal != null ? Number(p.precio_principal) : null,
+    moneda_principal: p.moneda_principal ? String(p.moneda_principal).toUpperCase() : null,
+    precio_secundario: p.precio_secundario != null ? Number(p.precio_secundario) : null,
+    moneda_secundaria: p.moneda_secundaria ? String(p.moneda_secundaria).toUpperCase() : null,
     precio_a_consultar: !!p.precio_a_consultar,
     ubicacion: {
       colonia: p.colonia || null,

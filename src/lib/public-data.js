@@ -117,8 +117,16 @@ export function applyFilters(records, filters = {}) {
     if (operacion && (p.tipo_operacion || '').toLowerCase() !== operacion.toLowerCase()) return false;
     if (tipo && (p.tipo_inmueble || '').toLowerCase() !== tipo.toLowerCase()) return false;
     if (recamaras && Number(p.recamaras || 0) < Number(recamaras)) return false;
-    if (precio_min && Number(p.precio_usd || 0) < Number(precio_min)) return false;
-    if (precio_max && Number(p.precio_usd || 0) > Number(precio_max)) return false;
+    // Filtro de precio: usa el monto principal nuevo (precio_principal) si está,
+    // si no, cae al legacy precio_usd. NOTA: el filtro asume que el rango
+    // viene en la MISMA moneda que el precio principal de cada propiedad.
+    if (precio_min || precio_max) {
+      const amount = (p.precio_principal != null && p.precio_principal !== '')
+        ? Number(p.precio_principal)
+        : Number(p.precio_usd || 0);
+      if (precio_min && amount < Number(precio_min)) return false;
+      if (precio_max && amount > Number(precio_max)) return false;
+    }
     if (q) {
       const text = [p.titulo, p.descripcion, p.colonia, p.ciudad, p.tipo_inmueble, p.tipo_operacion].join(' ').toLowerCase();
       if (!text.includes(q.toLowerCase())) return false;
