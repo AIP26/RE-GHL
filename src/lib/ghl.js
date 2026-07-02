@@ -90,6 +90,34 @@ export async function exchangeCodeForToken(code) {
 }
 
 // ---------------------------------------------------------------------
+// OAuth: mint location token desde un agency access_token.
+// Cuando la app se instala desde una cuenta de Agency, el token OAuth queda
+// scoped a Company. Para actuar sobre una sub-cuenta específica hay que
+// mintar un token per-location vía este endpoint. Devuelve access_token +
+// refresh_token con scope de la location.
+//
+// Docs: https://highlevel.stoplight.io/docs/integrations/... (endpoint
+//   POST /oauth/locationToken con Version: 2021-07-28).
+// ---------------------------------------------------------------------
+export async function mintLocationToken(agencyAccessToken, companyId, locationId) {
+  const body = new URLSearchParams({ companyId, locationId });
+  const { data } = await axios.post(
+    'https://services.leadconnectorhq.com/oauth/locationToken',
+    body.toString(),
+    {
+      headers: {
+        Authorization: `Bearer ${agencyAccessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Version: '2021-07-28',
+        Accept: 'application/json',
+      },
+      timeout: 30_000,
+    }
+  );
+  return data;   // { access_token, refresh_token, expires_in, locationId, userId, ... }
+}
+
+// ---------------------------------------------------------------------
 // OAuth: refresh
 // ---------------------------------------------------------------------
 export async function refreshAccessToken(refreshToken) {

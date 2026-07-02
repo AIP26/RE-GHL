@@ -6,8 +6,28 @@ import crypto from 'node:crypto';
 
 import { getAuthorizeUrl, exchangeCodeForToken } from '../lib/ghl.js';
 import { upsertTenantFromOAuth } from '../lib/tenants.js';
+import { upsertAgencyFromOAuth } from '../lib/agencies.js';
 
 const r = Router();
+
+/** Log seguro: nunca imprime tokens ni secretos. Sólo el "shape" del response
+ *  (keys presentes) + valores no sensibles como companyId, locationId, scope. */
+function logOAuthShape(prefix, tokenResp) {
+  if (!tokenResp || typeof tokenResp !== 'object') {
+    console.log(`[${prefix}] response no-object:`, tokenResp);
+    return;
+  }
+  const SENSITIVE = new Set(['access_token', 'refresh_token', 'id_token']);
+  const shape = {};
+  for (const [k, v] of Object.entries(tokenResp)) {
+    if (SENSITIVE.has(k)) {
+      shape[k] = typeof v === 'string' ? `<redacted ${v.length}ch>` : '<redacted>';
+    } else {
+      shape[k] = v;
+    }
+  }
+  console.log(`[${prefix}] response keys=[${Object.keys(tokenResp).join(',')}]`, shape);
+}
 
 // GET /auth  -> inicia el flow OAuth (redirige al chooselocation de GHL)
 r.get('/', (_req, res) => {
@@ -34,16 +54,49 @@ r.get('/callback', async (req, res) => {
 
   try {
     const tokenResp = await exchangeCodeForToken(String(code));
-    const tenant = await upsertTenantFromOAuth(tokenResp);
+    logOAuthShape('oauth/callback', tokenResp);
 
-    // Sin telemetría aquí — el webhook de instalación (Paso 3) cierra el setup
-    // creando el primer agente admin.
-    return res.send(
+    const locationId = tokenResp.locationId || tokenResp.location_id;
+    const companyId  = tokenResp.companyId  || tokenResp.company_id;
+
+    // Caso A — instalación a nivel Location (sub-cuenta): flujo normal.
+    if (locationId) {
+      const tenant = await upsertTenantFromOAuth(tokenResp);
+      return res.send(
+        renderHtml(
+          '¡Instalación exitosa!',
+          `<p>Tu cuenta de GoHighLevel quedó conectada.</p>
+           <p><strong>Location ID:</strong> <code>${escapeHtml(tenant.ghl_location_id)}</code></p>
+           <p>Ya puedes cerrar esta ventana y abrir el menú lateral desde GHL.</p>`
+        )
+      );
+    }
+
+    // Caso B — instalación a nivel Agency (Company): guardamos el token de
+    // agencia y esperamos a que un agente abra el panel desde una sub-cuenta.
+    // En ese momento el SSO mintará el location token on-demand.
+    if (companyId) {
+      const agency = await upsertAgencyFromOAuth(tokenResp);
+      console.log('[oauth/callback] agency install ok, companyId=%s agencyId=%s', companyId, agency.id);
+      return res.send(
+        renderHtml(
+          '¡Instalación de agencia lista!',
+          `<p>Conectaste la app <strong>a nivel agencia</strong> (Company).</p>
+           <p><strong>Company ID:</strong> <code>${escapeHtml(companyId)}</code></p>
+           <p>Ahora, dentro de cualquier sub-cuenta donde quieras usar la app, abre <em>Listings</em> desde el menú lateral. La primera vez que un agente entre, activamos automáticamente esa sub-cuenta.</p>
+           <p style="color:#64748b;font-size:14px">No hace falta reinstalar por cada sub-cuenta.</p>`
+        )
+      );
+    }
+
+    // Caso C — GHL no devolvió ninguno. Reportamos el shape para diagnóstico.
+    console.error('[oauth/callback] response sin locationId ni companyId. Keys:', Object.keys(tokenResp));
+    return res.status(400).send(
       renderHtml(
-        '¡Instalación exitosa!',
-        `<p>Tu cuenta de GoHighLevel quedó conectada.</p>
-         <p><strong>Location ID:</strong> <code>${escapeHtml(tenant.ghl_location_id)}</code></p>
-         <p>Ya puedes cerrar esta ventana y abrir el menú lateral desde GHL.</p>`
+        'No pudimos completar la instalación',
+        `<p>GoHighLevel no devolvió <code>locationId</code> ni <code>companyId</code> en la respuesta.</p>
+         <p>Contacta a soporte con estos datos:</p>
+         <pre>${escapeHtml(JSON.stringify(Object.keys(tokenResp), null, 2))}</pre>`
       )
     );
   } catch (err) {

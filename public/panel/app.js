@@ -26,8 +26,11 @@
         const params = new URLSearchParams(window.location.search);
         const locationId = params.get('locationId');
         const userId = params.get('userId');
+        const companyId = params.get('companyId');
         if (!locationId || !userId) return false;
-        const r = await fetch(`${API}/auth/sso?locationId=${encodeURIComponent(locationId)}&userId=${encodeURIComponent(userId)}`);
+        const qs = new URLSearchParams({ locationId, userId });
+        if (companyId) qs.set('companyId', companyId);
+        const r = await fetch(`${API}/auth/sso?${qs}`);
         if (!r.ok) return false;
         const j = await r.json();
         if (!j.token) return false;
@@ -275,10 +278,13 @@
           const params = new URLSearchParams(window.location.search);
           const locationId = params.get('locationId');
           const userId = params.get('userId');
+          const companyId = params.get('companyId');
           if (!locationId || !userId) {
             throw new Error('Faltan locationId o userId en la URL. Abre el panel desde GHL.');
           }
-          const sso = await fetch(`${API}/auth/sso?locationId=${encodeURIComponent(locationId)}&userId=${encodeURIComponent(userId)}`).then((r) => r.json());
+          const qs = new URLSearchParams({ locationId, userId });
+          if (companyId) qs.set('companyId', companyId);
+          const sso = await fetch(`${API}/auth/sso?${qs}`).then((r) => r.json());
           if (!sso.token) throw new Error(sso.error || 'sso_failed');
           setToken(sso.token);
           const [config, agentsData, collectionsData] = await Promise.all([
