@@ -15,6 +15,7 @@ import domain from './domain.js';
 import brand from './brand.js';
 import apikeys from './apikeys.js';
 import v1 from './v1.js';
+import ghlProxy from './ghl-proxy.js';
 import { requireSession } from '../middleware/auth.js';
 import { env } from '../config/env.js';
 
@@ -34,6 +35,7 @@ export function buildApiRouter() {
   r.use('/brand', brand);
   r.use('/apikeys', apikeys);
   r.use('/v1', v1);
+  r.use('/ghl', ghlProxy);
 
   // GET /api/runtime-config — config pública que necesita el SPA del menú
   // lateral (Google Maps key, Cloudinary cloud name). Requiere sesión.

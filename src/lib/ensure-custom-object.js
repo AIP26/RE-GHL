@@ -68,6 +68,9 @@ const FIELDS = [
   { fieldKey: 'cta_tipo',            name: 'CTA tipo',                  dataType: 'SINGLE_OPTIONS', options: ['whatsapp','formulario','llamar','ninguno'] },
   { fieldKey: 'cta_valor',           name: 'CTA valor',                 dataType: 'LARGE_TEXT' },
   { fieldKey: 'ficha_url',           name: 'URL orgánica',              dataType: 'TEXT' },
+  { fieldKey: 'referencia_interna',  name: 'Referencia interna',        dataType: 'TEXT' },
+  { fieldKey: 'referencia_publica',  name: 'Referencia pública',        dataType: 'TEXT' },
+  { fieldKey: 'cta_texto',           name: 'CTA texto',                 dataType: 'LARGE_TEXT' },
 ];
 
 async function ensureSchema(accessToken, locationId) {

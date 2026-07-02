@@ -401,6 +401,68 @@ r.delete('/:id', requireSession, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
+// POST /api/property/:id/duplicate — clona una propiedad existente
+// Reglas (BLOQUE P1 FEATURE 2):
+//   - Copia todos los campos EXCEPTO: slug_url, fecha_publicacion, ficha_url,
+//     referencia_interna, referencia_publica, y las colecciones asignadas.
+//   - Título nuevo: "Copia de <titulo>".
+//   - Estado forzado a "Disponible", fecha_publicacion = hoy.
+//   - Devuelve el record recién creado para que el frontend abra su form
+//     de edición.
+// ---------------------------------------------------------------------
+r.post('/:id/duplicate', requireSession, async (req, res) => {
+  try {
+    const fieldIds = getFieldIds();
+    const t = await getTenantWithTokens(req.tenant.id);
+    const original = await getObjectRecord(t.access_token, fieldIds.objectKey, req.params.id, req.tenant.ghl_location_id);
+    const src = original?.properties || {};
+    const EXCLUDE = new Set(['slug_url', 'fecha_publicacion', 'ficha_url', 'referencia_interna', 'referencia_publica']);
+    const props = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (EXCLUDE.has(k)) continue;
+      if (v == null || v === '') continue;
+      props[k] = v;
+    }
+    props.titulo = `Copia de ${src.titulo || 'propiedad'}`.slice(0, 100);
+    props.estado = 'Disponible';
+    props.fecha_publicacion = new Date().toISOString().slice(0, 10);
+    // Slug se regenera al vuelo por timestamp
+    props.slug_url = slugify(props.titulo, { lower: true, strict: true }) + '-' + Date.now().toString(36).slice(-4);
+
+    const created = await createObjectRecord(t.access_token, fieldIds.objectKey, {
+      locationId: t.ghl_location_id,
+      properties: props,
+    });
+    console.log(`[property/duplicate] originalId=${req.params.id} newId=${created?.id || created?._id} tenant=${req.tenant.id}`);
+    res.json({ record: created });
+  } catch (err) {
+    console.error('[property/duplicate]', err?.response?.data || err.message);
+    res.status(err.response?.status || 500).json({
+      error: 'duplicate_failed',
+      detail: err?.response?.data || err.message,
+    });
+  }
+});
+
+// ---------------------------------------------------------------------
+// DELETE /api/property/:id/views — resetea el contador de vistas
+// (BLOQUE P1 FEATURE 3). Borra todos los page_views del tenant para
+// ese propertyId. No toca GHL.
+// ---------------------------------------------------------------------
+r.delete('/:id/views', requireSession, async (req, res) => {
+  const sb = getSupabase();
+  const { error, count } = await sb
+    .from('page_views').delete({ count: 'exact' })
+    .eq('tenant_id', req.tenant.id).eq('property_id', req.params.id);
+  if (error) {
+    console.error('[property/reset-views]', error);
+    return res.status(500).json({ error: 'reset_failed', detail: error.message });
+  }
+  console.log(`[property/reset-views] propertyId=${req.params.id} tenant=${req.tenant.id} removed=${count ?? 0}`);
+  res.json({ ok: true, removed: count ?? 0 });
+});
+
+// ---------------------------------------------------------------------
 // Helper: slug único por tenant
 // ---------------------------------------------------------------------
 async function generateUniqueSlug(tenantId, titulo) {

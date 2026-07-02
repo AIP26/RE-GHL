@@ -4,10 +4,10 @@
   "folderId": "AG5F4RBZsGpMDnvb5xek",
   "folderName": "Propiedad Info",
   "locationId": "cNg6MFQcxv8bZnwCppoM",
-  "generatedAt": "2026-07-02T22:26:45.780Z",
+  "generatedAt": "2026-07-02T22:45:58.808Z",
   "summary": {
-    "defined": 54,
-    "created": 0,
+    "defined": 57,
+    "created": 3,
     "skipped": 54,
     "failed": 0
   },
@@ -30,6 +30,12 @@
       "name": "Video propio URL",
       "dataType": "TEXT"
     },
+    "cta_texto": {
+      "id": "fJLFo834LgxtQJjYXpTf",
+      "fieldKey": "custom_objects.propiedad.cta_texto",
+      "name": "CTA texto",
+      "dataType": "LARGE_TEXT"
+    },
     "tipo_operacion": {
       "id": "4J3wuaAiY4cSCsfXTc87",
       "fieldKey": "custom_objects.propiedad.tipo_operacion",
@@ -42,6 +48,12 @@
       "name": "Moneda principal",
       "dataType": "SINGLE_OPTIONS"
     },
+    "referencia_interna": {
+      "id": "juXKDJKWVo8jsw8rl2Kx",
+      "fieldKey": "custom_objects.propiedad.referencia_interna",
+      "name": "Referencia interna",
+      "dataType": "TEXT"
+    },
     "tipo_inmueble": {
       "id": "YhswNukXx8Wlhv4q7egr",
       "fieldKey": "custom_objects.propiedad.tipo_inmueble",
@@ -53,6 +65,12 @@
       "fieldKey": "custom_objects.propiedad.precio_secundario",
       "name": "Precio secundario",
       "dataType": "NUMERICAL"
+    },
+    "referencia_publica": {
+      "id": "tqtfOSl9xijI0f2YPiF0",
+      "fieldKey": "custom_objects.propiedad.referencia_publica",
+      "name": "Referencia pública",
+      "dataType": "TEXT"
     },
     "estado": {
       "id": "Syu3yxvaaFSvBr8U0RRz",

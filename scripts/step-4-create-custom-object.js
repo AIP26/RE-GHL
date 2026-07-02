@@ -45,6 +45,9 @@ const FIELDS = [
   { fieldKey: 'agente_responsable',  name: 'Agente responsable',        dataType: 'TEXT' },
   { fieldKey: 'cta_tipo',            name: 'CTA tipo',                  dataType: 'SINGLE_OPTIONS', options: ['global','whatsapp','formulario','redirect'] },
   { fieldKey: 'cta_valor',           name: 'CTA valor',                 dataType: 'TEXT' },
+  { fieldKey: 'cta_texto',           name: 'CTA texto',                 dataType: 'LARGE_TEXT' },
+  { fieldKey: 'referencia_interna',  name: 'Referencia interna',        dataType: 'TEXT' },
+  { fieldKey: 'referencia_publica',  name: 'Referencia pública',        dataType: 'TEXT' },
 
   // Precio
   { fieldKey: 'precio_usd',          name: 'Precio USD',                dataType: 'NUMERICAL' },
