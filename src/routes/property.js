@@ -24,12 +24,20 @@ const GHL_FORM_ALLOWED_HOSTS = [
   'msgsndr.com',
 ];
 
-/** Valida el snippet HTML para cta_tipo=formulario. Extrae el <iframe> con
- *  atributo src y verifica que el host caiga bajo un dominio autorizado.
- *  Retorna { ok, error, src }. */
+/** Valida el snippet HTML para cta_tipo=formulario. Acepta 3 formatos:
+ *    1) "ghl-form:<formId>"      → picker de Formulario GHL nativo (BLOQUE P1)
+ *    2) "ghl-calendar:<calId>"   → picker de Calendario GHL nativo (BLOQUE P1)
+ *    3) "<iframe...>"            → embed manual (legacy; se extrae src y se
+ *                                  valida contra la whitelist de dominios GHL).
+ *  Retorna { ok, error, kind, src, host }. */
 export function validateGhlFormEmbed(html) {
   if (!html || typeof html !== 'string') return { ok: false, error: 'empty' };
-  const m = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  const s = html.trim();
+  // Formatos nuevos (dropdown en el panel)
+  if (/^ghl-form:[A-Za-z0-9_-]{6,64}$/.test(s)) return { ok: true, kind: 'form', id: s.slice('ghl-form:'.length) };
+  if (/^ghl-calendar:[A-Za-z0-9_-]{6,64}$/.test(s)) return { ok: true, kind: 'calendar', id: s.slice('ghl-calendar:'.length) };
+  // Formato legacy: <iframe src="...">
+  const m = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
   if (!m) return { ok: false, error: 'no_iframe_src' };
   const src = m[1];
   let url;
@@ -37,7 +45,7 @@ export function validateGhlFormEmbed(html) {
   const host = url.hostname.toLowerCase();
   const allowed = GHL_FORM_ALLOWED_HOSTS.some((d) => host === d || host.endsWith('.' + d));
   if (!allowed) return { ok: false, error: 'host_not_allowed', host };
-  return { ok: true, src, host };
+  return { ok: true, kind: 'embed', src, host };
 }
 
 // ---------------------------------------------------------------------

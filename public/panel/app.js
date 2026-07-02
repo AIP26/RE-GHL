@@ -119,6 +119,8 @@
       { key: 'preventa', label: 'Preventa', type: 'toggle' },
       { key: 'fecha_entrega', label: 'Fecha estimada de entrega', type: 'date', showIf: (s) => s.preventa },
       { key: 'agente_responsable', label: 'Agente responsable', type: 'agent', required: true },
+      { key: 'referencia_interna', label: 'Referencia interna (solo panel)', type: 'text', maxLength: 40, help: 'ID privado para tu equipo. No se muestra al público.' },
+      { key: 'referencia_publica', label: 'Referencia pública (visible en ficha)', type: 'text', maxLength: 40, help: 'Código público que aparece en la ficha (ej. "REF-2026-042").' },
     ]},
     { title: 'Precio', fields: [
       { key: 'precio_principal', label: 'Precio principal', type: 'number', required: true, span: 1 },
@@ -175,8 +177,11 @@
       { key: 'planos_url', label: 'Planos URL', type: 'text' },
     ]},
     { title: 'CTA y colecciones', fields: [
-      { key: 'cta_tipo', label: 'CTA de la propiedad', type: 'select', options: ['global','whatsapp','formulario','redirect'], defaultValue: 'global' },
-      { key: 'cta_valor', label: 'Valor del CTA (número, snippet o URL)', type: 'cta_value', showIf: (s) => s.cta_tipo && s.cta_tipo !== 'global', span: 2 },
+      { key: 'cta_tipo', label: 'CTA de la propiedad', type: 'select', options: ['global','whatsapp','formulario','redirect'], defaultValue: 'global',
+        help: 'Elige "formulario" para usar un Form o Calendario nativo de GHL desde un dropdown.' },
+      { key: 'cta_valor', label: 'Configuración del CTA', type: 'cta_value', showIf: (s) => s.cta_tipo && s.cta_tipo !== 'global', span: 2 },
+      { key: 'cta_texto', label: 'Texto del botón (opcional)', type: 'text', maxLength: 60, showIf: (s) => s.cta_tipo && s.cta_tipo !== 'global',
+        help: 'Texto que verá el visitante. Ej. "Agenda una visita" o "Quiero información".' },
       { key: '_collections', label: 'Asignar a colecciones', type: 'collections', full: true },
     ]},
   ];
@@ -240,7 +245,8 @@
     const norm = (s) => String(s || '')
       .toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip diacríticos
-      .replace(/[_\s-]+/g, ' ')                         // snake_case → space
+      .replace(/[()[\]{}.,;:!?"'`]/g, '')                // strip puntuación
+      .replace(/[_\s\-/]+/g, ' ')                        // snake_case, slashes → space
       .trim();
     const rawNorm = norm(rawValue);
     if (!rawNorm) return rawValue;
@@ -480,7 +486,11 @@
       default:
         control = html`<input className="form-input" value=${value || ''} onInput=${(e) => set(field.key, e.target.value)} />`;
     }
-    return html`<div className=${'form-field ' + span}>${label}${control}</div>`;
+    return html`<div className=${'form-field ' + span}>
+      ${label}
+      ${control}
+      ${field.help ? html`<span className="form-help" style=${{ marginTop: '4px' }}>${field.help}</span>` : null}
+    </div>`;
   }
 
   function PlacesInput({ value, apiKey, onPlace }) {
@@ -722,43 +732,21 @@
   }
 
   // CtaValueInput — polimórfico según state.cta_tipo.
-  //   - formulario: <textarea> con validación live del <iframe src=...> contra
-  //     whitelist de dominios GHL + preview live.
+  //   - formulario: toggle "Formulario | Calendario | Embed manual" + dropdown
+  //     que carga los assets nativos del tenant desde GHL (/api/ghl/forms |
+  //     /api/ghl/calendars). Valor guardado en cta_valor:
+  //       · "ghl-form:<formId>"      (nuevo, seleccionado desde dropdown)
+  //       · "ghl-calendar:<calId>"   (nuevo, seleccionado desde dropdown)
+  //       · "<iframe...>"            (legacy: pegado a mano, mantenido para
+  //                                   compatibilidad con propiedades ya guardadas)
   //   - whatsapp:  input tel
   //   - redirect:  input url
   function CtaValueInput({ state, set, field }) {
     const value = state.cta_valor || '';
     const tipo = state.cta_tipo;
-    const validation = useMemo(() => validateGhlEmbed(value), [value]);
 
     if (tipo === 'formulario') {
-      return html`<${Fragment}>
-        <textarea
-          id=${field.key}
-          className="form-textarea"
-          data-testid="cta-form-textarea"
-          rows="4"
-          placeholder='Pega aquí el código embed de tu formulario GHL (empieza con <iframe...)'
-          value=${value}
-          onInput=${(e) => set(field.key, e.target.value)}
-        />
-        ${value && !validation.ok ? html`<div className="form-error" data-testid="cta-form-error">
-          Solo se permiten formularios de GoHighLevel.
-          ${validation.error === 'no_iframe_src' ? ' Falta un <iframe src="…">.' : ''}
-          ${validation.error === 'host_not_allowed' ? ` Dominio "${validation.host}" no está autorizado.` : ''}
-        </div>` : null}
-        ${validation.ok ? html`<div className="cta-form-preview" data-testid="cta-form-preview">
-          <div className="cta-form-preview-title">Vista previa</div>
-          <iframe
-            src=${validation.src}
-            title="Preview formulario GHL"
-            loading="lazy"
-            sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-            style=${{ width: '100%', height: '400px', border: 0, display: 'block' }}
-          ></iframe>
-        </div>` : null}
-        <span className="form-help">Dominios válidos: *.gohighlevel.com · *.leadconnectorhq.com · *.msgsndr.com</span>
-      <//>`;
+      return html`<${CtaGhlAssetPicker} value=${value} onChange=${(v) => set(field.key, v)} field=${field} />`;
     }
 
     // whatsapp / redirect / otros → input plano.
@@ -775,6 +763,139 @@
       placeholder=${placeholder}
       onInput=${(e) => set(field.key, e.target.value)}
     />`;
+  }
+
+  // Detecta el "modo" actual de cta_valor para pre-seleccionar la pestaña
+  // correcta al abrir el form en modo edición.
+  function detectCtaMode(value) {
+    if (!value) return 'form';
+    if (String(value).startsWith('ghl-form:')) return 'form';
+    if (String(value).startsWith('ghl-calendar:')) return 'calendar';
+    return 'embed';
+  }
+
+  // Picker para elegir asset nativo GHL (Formulario o Calendario).
+  // Carga vía /api/ghl/forms · /api/ghl/calendars usando el token del panel.
+  function CtaGhlAssetPicker({ value, onChange, field }) {
+    const [mode, setMode] = useState(() => detectCtaMode(value));
+    const [forms, setForms] = useState(null);   // null = no cargado
+    const [calendars, setCalendars] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [loadErr, setLoadErr] = useState('');
+
+    // Cargar la lista cuando el usuario activa "form" o "calendar" por primera vez.
+    useEffect(() => {
+      let cancelled = false;
+      const load = async () => {
+        setLoadErr('');
+        if (mode === 'form' && forms == null) {
+          setLoading(true);
+          try {
+            const d = await api('/ghl/forms');
+            if (!cancelled) setForms(d.items || []);
+          } catch (e) {
+            if (!cancelled) { setForms([]); setLoadErr('No se pudieron cargar los formularios de GHL.'); }
+          } finally { if (!cancelled) setLoading(false); }
+        } else if (mode === 'calendar' && calendars == null) {
+          setLoading(true);
+          try {
+            const d = await api('/ghl/calendars');
+            if (!cancelled) setCalendars(d.items || []);
+          } catch (e) {
+            if (!cancelled) { setCalendars([]); setLoadErr('No se pudieron cargar los calendarios de GHL.'); }
+          } finally { if (!cancelled) setLoading(false); }
+        }
+      };
+      load();
+      return () => { cancelled = true; };
+    }, [mode]);
+
+    const setMode2 = (m) => {
+      // Al cambiar de modo NO limpiamos el valor: si el usuario regresa al modo
+      // anterior verá su selección previa. Solo limpiamos si el modo actual no
+      // aplica al valor guardado.
+      setMode(m);
+      const curMode = detectCtaMode(value);
+      if (curMode !== m) onChange('');
+    };
+
+    const selectedFormId = mode === 'form' && value.startsWith('ghl-form:') ? value.slice('ghl-form:'.length) : '';
+    const selectedCalId = mode === 'calendar' && value.startsWith('ghl-calendar:') ? value.slice('ghl-calendar:'.length) : '';
+    const embedValue = mode === 'embed' ? value : '';
+    const embedValidation = useMemo(() => validateGhlEmbed(embedValue), [embedValue]);
+
+    const tabBtn = (m, label) => html`<button
+      type="button"
+      className=${'cta-mode-tab' + (mode === m ? ' active' : '')}
+      onClick=${() => setMode2(m)}
+      data-testid=${'cta-mode-' + m}
+    >${label}</button>`;
+
+    return html`<div className="cta-asset-picker" data-testid="cta-asset-picker">
+      <div className="cta-mode-tabs" style=${{ display: 'flex', gap: '4px', marginBottom: '10px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
+        ${tabBtn('form', 'Formulario GHL')}
+        ${tabBtn('calendar', 'Calendario GHL')}
+        ${tabBtn('embed', 'Pegar embed')}
+      </div>
+
+      ${mode === 'form' ? html`<${Fragment}>
+        <select
+          id=${field.key}
+          className="form-select"
+          data-testid="cta-form-select"
+          value=${selectedFormId}
+          onChange=${(e) => onChange(e.target.value ? 'ghl-form:' + e.target.value : '')}
+        >
+          <option value="">${loading ? 'Cargando formularios…' : '— Selecciona un formulario —'}</option>
+          ${(forms || []).map((f) => html`<option key=${f.id} value=${f.id}>${f.name || f.id}</option>`)}
+        </select>
+        ${loadErr ? html`<div className="form-error">${loadErr}</div>` : null}
+        ${(forms && forms.length === 0 && !loading) ? html`<span className="form-help">Aún no tienes formularios en esta location de GHL. Crea uno primero en Sites → Forms.</span>` : null}
+      <//>` : null}
+
+      ${mode === 'calendar' ? html`<${Fragment}>
+        <select
+          id=${field.key}
+          className="form-select"
+          data-testid="cta-calendar-select"
+          value=${selectedCalId}
+          onChange=${(e) => onChange(e.target.value ? 'ghl-calendar:' + e.target.value : '')}
+        >
+          <option value="">${loading ? 'Cargando calendarios…' : '— Selecciona un calendario —'}</option>
+          ${(calendars || []).map((c) => html`<option key=${c.id} value=${c.id}>${c.name || c.id}</option>`)}
+        </select>
+        ${loadErr ? html`<div className="form-error">${loadErr}</div>` : null}
+        ${(calendars && calendars.length === 0 && !loading) ? html`<span className="form-help">Aún no tienes calendarios en esta location de GHL.</span>` : null}
+      <//>` : null}
+
+      ${mode === 'embed' ? html`<${Fragment}>
+        <textarea
+          id=${field.key}
+          className="form-textarea"
+          data-testid="cta-form-textarea"
+          rows="4"
+          placeholder='Pega aquí el código embed de tu formulario GHL (empieza con <iframe...)'
+          value=${embedValue}
+          onInput=${(e) => onChange(e.target.value)}
+        />
+        ${embedValue && !embedValidation.ok ? html`<div className="form-error" data-testid="cta-form-error">
+          Solo se permiten formularios de GoHighLevel.
+          ${embedValidation.error === 'no_iframe_src' ? ' Falta un <iframe src="…">.' : ''}
+          ${embedValidation.error === 'host_not_allowed' ? ` Dominio "${embedValidation.host}" no está autorizado.` : ''}
+        </div>` : null}
+        ${embedValidation.ok ? html`<div className="cta-form-preview" data-testid="cta-form-preview">
+          <div className="cta-form-preview-title">Vista previa</div>
+          <iframe
+            src=${embedValidation.src}
+            title="Preview formulario GHL"
+            loading="lazy"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+            style=${{ width: '100%', height: '400px', border: 0, display: 'block' }}
+          ></iframe>
+        </div>` : null}
+        <span className="form-help">Dominios válidos: *.gohighlevel.com · *.leadconnectorhq.com · *.msgsndr.com</span>
+      <//>` : null}
+    </div>`;
   }
 
   // Whitelist local (debe coincidir con server-side y portal público).
@@ -2201,8 +2322,12 @@
       }
       if (filters.estado && (p.estado || '').toLowerCase() !== filters.estado.toLowerCase()) return false;
       if (filters.tipo && (p.tipo_inmueble || '').toLowerCase() !== filters.tipo.toLowerCase()) return false;
-      if (filters.precio_min && Number(p.precio_usd || 0) < Number(filters.precio_min)) return false;
-      if (filters.precio_max && Number(p.precio_usd || 0) > Number(filters.precio_max)) return false;
+      // FIX (P1): filtro de precio usa precio_principal (nuevo campo con moneda);
+      // fallback a precio_usd legacy sólo si no hay precio_principal. Cubre
+      // propiedades en MXN, USD y CAD sin excluirlas cuando precio_usd está vacío.
+      const priceForFilter = Number(p.precio_principal || p.precio_usd || 0);
+      if (filters.precio_min && priceForFilter < Number(filters.precio_min)) return false;
+      if (filters.precio_max && priceForFilter > Number(filters.precio_max)) return false;
       if (filters.agente && p.agente_responsable !== filters.agente) return false;
       // colecciones: no tenemos en el record desde GHL — para Fase 1 lo omitimos del filtro
       return true;
@@ -2260,8 +2385,8 @@
           <option value="">Todos los tipos</option>
           ${['Casa', 'Departamento', 'Local', 'Terreno', 'Oficina', 'Villa', 'Penthouse'].map((t) => html`<option key=${t} value=${t}>${t}</option>`)}
         </select>
-        <input type="number" className="form-input" placeholder="Precio mín USD" value=${filters.precio_min} onInput=${(e) => setFilters({ ...filters, precio_min: e.target.value })} />
-        <input type="number" className="form-input" placeholder="Precio máx USD" value=${filters.precio_max} onInput=${(e) => setFilters({ ...filters, precio_max: e.target.value })} />
+        <input type="number" className="form-input" placeholder="Precio mín" value=${filters.precio_min} onInput=${(e) => setFilters({ ...filters, precio_min: e.target.value })} data-testid="listings-precio-min" />
+        <input type="number" className="form-input" placeholder="Precio máx" value=${filters.precio_max} onInput=${(e) => setFilters({ ...filters, precio_max: e.target.value })} data-testid="listings-precio-max" />
         ${isAdmin ? html`<select className="form-input" value=${filters.agente} onChange=${(e) => setFilters({ ...filters, agente: e.target.value })}>
           <option value="">Todos los agentes</option>
           ${(ctx.agentes || []).map((a) => html`<option key=${a.ghl_user_id} value=${a.ghl_user_id}>${a.nombre}</option>`)}
@@ -2360,6 +2485,34 @@
           onChangeAgent: () => { setOpenMenu(null); setAgentTarget(openMenu.rec); },
           onChangeEstado: (nuevo) => { setOpenMenu(null); changeEstado(openMenu.rec, nuevo); },
           onDelete: () => { setOpenMenu(null); onDelete(openMenu.rec); },
+          onDuplicate: async () => {
+            const rec = openMenu.rec;
+            setOpenMenu(null);
+            const titulo = rec.properties?.titulo || 'propiedad';
+            if (!confirm(`¿Duplicar "${titulo}"? Se creará una copia con el título "Copia de ${titulo}" y podrás editarla.`)) return;
+            try {
+              const r = await api('/property/' + rec.id + '/duplicate', { method: 'POST' });
+              const newId = r.record?.id || r.record?._id;
+              toast('Propiedad duplicada ✓', 'success');
+              await reload();
+              if (newId) goEdit(newId);
+            } catch (e) {
+              toast('Error al duplicar: ' + (e.detail?.message || e.message), 'error');
+            }
+          },
+          onResetViews: async () => {
+            const rec = openMenu.rec;
+            setOpenMenu(null);
+            const current = viewCounts[rec.id] || 0;
+            if (!confirm(`Resetear el contador de vistas para "${rec.properties?.titulo || 'propiedad'}"? Se borrarán ${current} vista${current === 1 ? '' : 's'} registrada${current === 1 ? '' : 's'}.`)) return;
+            try {
+              const r = await api('/property/' + rec.id + '/views', { method: 'DELETE' });
+              toast(`Vistas reseteadas (${r.removed || 0} eliminadas) ✓`, 'success');
+              await reload();
+            } catch (e) {
+              toast('Error al resetear vistas: ' + (e.detail?.message || e.message), 'error');
+            }
+          },
         }),
         document.body
       ) : null}
@@ -2367,7 +2520,7 @@
   }
 
   // Floating dropdown menu rendered via portal — flips up when near bottom.
-  function RowMenuPortal({ anchor, rec, ctx, portalBase, onClose, onEdit, onShare, onChangeAgent, onChangeEstado, onDelete }) {
+  function RowMenuPortal({ anchor, rec, ctx, portalBase, onClose, onEdit, onShare, onChangeAgent, onChangeEstado, onDelete, onDuplicate, onResetViews }) {
     const ref = useRef(null);
     const [pos, setPos] = useState(null);
     const p = rec.properties || {};
@@ -2415,8 +2568,10 @@
     >
       <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener" data-testid=${'listing-view-' + rec.id}>Ver propiedad</a>
       <button onClick=${onEdit} data-testid=${'listing-edit-' + rec.id}>Editar</button>
+      <button onClick=${onDuplicate} data-testid=${'listing-duplicate-' + rec.id}>Duplicar propiedad</button>
       <button onClick=${onChangeAgent} data-testid=${'listing-change-agent-' + rec.id}>Cambiar agente</button>
       <button onClick=${onShare} data-testid=${'share-btn-' + rec.id}>URL orgánica</button>
+      <button onClick=${onResetViews} data-testid=${'listing-reset-views-' + rec.id}>Resetear vistas</button>
       <div className="row-menu-sep">PDF</div>
       <a href=${'/p/' + slug + '/pdf?v=con-agente-1pag' + previewQS} target="_blank" rel="noopener">Con datos · 1 pág</a>
       <a href=${'/p/' + slug + '/pdf?v=con-agente-2pag' + previewQS} target="_blank" rel="noopener">Con datos · 2 págs</a>

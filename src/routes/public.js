@@ -257,6 +257,7 @@ r.get('/p/:slug', async (req, res, next) => {
             <div>
               <h1 style="font-size:26px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em">${esc(p.titulo || 'Propiedad')}</h1>
               <div style="color:var(--color-text-muted);font-size:14px">${esc([p.colonia, p.ciudad, p.estado_municipio].filter(Boolean).join(', '))}</div>
+              ${p.referencia_publica ? `<div style="margin-top:8px" data-testid="ref-publica-slug"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background:var(--color-primary,#0ea5e9);color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em">REF · ${esc(p.referencia_publica)}</span></div>` : ''}
 
               <div class="price-block">
                 <div class="usd">${esc(usd)}</div>
@@ -482,6 +483,7 @@ async function handleFichaOrganica(req, res, next) {
 
         <h1 style="font-size:24px;font-weight:800;margin:22px 0 4px;letter-spacing:-.01em">${esc(p.titulo || 'Propiedad')}</h1>
         <div style="color:#64748b;font-size:14px">${esc([p.colonia, p.ciudad, p.estado_municipio].filter(Boolean).join(', '))}</div>
+        ${p.referencia_publica ? `<div style="margin-top:8px" data-testid="ref-publica-ficha"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em">REF · ${esc(p.referencia_publica)}</span></div>` : ''}
 
         <div style="margin:18px 0 8px;font-size:30px;font-weight:800;color:#0f172a">${esc(usd)}</div>
         ${mxn ? `<div style="color:#64748b;font-size:14px">${esc(mxn)}</div>` : ''}
@@ -663,29 +665,47 @@ function whatsappFab(brand) {
 // whitelist server-side de `routes/property.js`.
 const GHL_FORM_HOSTS_PUBLIC = ['gohighlevel.com', 'leadconnectorhq.com', 'msgsndr.com'];
 
+/** Extrae el destino final para el CTA=formulario según el formato guardado
+ *  en `cta_valor`. Soporta 3 formatos (ver validateGhlFormEmbed en property.js):
+ *    · "ghl-form:<id>"      → https://api.leadconnectorhq.com/widget/form/<id>
+ *    · "ghl-calendar:<id>"  → https://api.leadconnectorhq.com/widget/booking/<id>
+ *    · "<iframe src=...>"   → src del iframe si el host cae en la whitelist
+ *  Devuelve { kind: 'form'|'calendar'|'embed', src } o null si inválido. */
+function resolveGhlAssetSrc(value) {
+  if (!value || typeof value !== 'string') return null;
+  const s = value.trim();
+  const mForm = s.match(/^ghl-form:([A-Za-z0-9_-]{6,64})$/);
+  if (mForm) return { kind: 'form', src: `https://api.leadconnectorhq.com/widget/form/${mForm[1]}` };
+  const mCal = s.match(/^ghl-calendar:([A-Za-z0-9_-]{6,64})$/);
+  if (mCal) return { kind: 'calendar', src: `https://api.leadconnectorhq.com/widget/booking/${mCal[1]}` };
+  // Legacy: <iframe src="...">
+  const m = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (!m) return null;
+  let url;
+  try { url = new URL(m[1]); } catch { return null; }
+  const host = url.hostname.toLowerCase();
+  const allowed = GHL_FORM_HOSTS_PUBLIC.some((d) => host === d || host.endsWith('.' + d));
+  if (!allowed) return null;
+  return { kind: 'embed', src: m[1] };
+}
+
 /** Extrae el <iframe> del snippet HTML, valida su host contra la whitelist y
  *  devuelve un HTML seguro con `sandbox` permisivo suficiente para GHL Forms.
  *  Si el snippet no es válido devuelve '' (el caller cae a fallback). */
-function renderGhlFormEmbed(html) {
-  if (!html || typeof html !== 'string') return '';
-  const m = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
-  if (!m) return '';
-  const src = m[1];
-  let url;
-  try { url = new URL(src); } catch { return ''; }
-  const host = url.hostname.toLowerCase();
-  const allowed = GHL_FORM_HOSTS_PUBLIC.some((d) => host === d || host.endsWith('.' + d));
-  if (!allowed) return '';
-  // Re-emitimos el iframe con atributos seguros y responsive.
-  // No confiamos en atributos del snippet original (podría inyectar handlers).
+function renderGhlFormEmbed(value) {
+  const asset = resolveGhlAssetSrc(value);
+  if (!asset) return '';
+  // Calendarios GHL requieren un poco más de alto (agenda + slots).
+  const height = asset.kind === 'calendar' ? 720 : 600;
+  const title = asset.kind === 'calendar' ? 'Agenda una cita' : 'Formulario de contacto';
   return `<div class="ghl-form-embed">
     <iframe
-      src="${esc(src)}"
-      title="Formulario de contacto"
+      src="${esc(asset.src)}"
+      title="${esc(title)}"
       loading="lazy"
       referrerpolicy="no-referrer-when-downgrade"
       sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-      style="width:100%;height:600px;border:0;display:block"
+      style="width:100%;height:${height}px;border:0;display:block"
     ></iframe>
   </div>`;
 }
@@ -694,27 +714,30 @@ function renderCTA(p, agent, brand, record) {
   // Resolución por prioridad: override por propiedad > widget global
   const overrideType = p.cta_tipo;
   const overrideVal = p.cta_valor;
+  // BLOQUE P1: texto del botón personalizable por propiedad
+  const customLabel = (p.cta_texto || '').trim();
+  const labelFor = (fallback) => customLabel || fallback;
 
   let primaryHtml = '';
   if (overrideType === 'whatsapp' && overrideVal) {
-    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(overrideVal).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
+    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(overrideVal).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor('Contactar por WhatsApp'))}</a>`;
   } else if (overrideType === 'formulario' && overrideVal) {
     primaryHtml = renderGhlFormEmbed(overrideVal);
     // Si el snippet no es válido, `renderGhlFormEmbed` devuelve '' y caemos al
     // fallback global más abajo (widget de contacto / whatsapp).
     if (!primaryHtml) {
       if (agent?.whatsapp) {
-        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(agent.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar a ${esc(agent.nombre || 'el agente')}</a>`;
+        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(agent.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor(`Contactar a ${agent.nombre || 'el agente'}`))}</a>`;
       } else if (brand?.whatsapp) {
-        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
+        primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor('Contactar por WhatsApp'))}</a>`;
       }
     }
   } else if (overrideType === 'redirect' && overrideVal) {
-    primaryHtml = `<a class="btn btn-block" href="${esc(overrideVal)}" target="_blank" rel="noopener">Más información</a>`;
+    primaryHtml = `<a class="btn btn-block" href="${esc(overrideVal)}" target="_blank" rel="noopener">${esc(labelFor('Más información'))}</a>`;
   } else if (agent?.whatsapp) {
-    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(agent.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar a ${esc(agent.nombre || 'el agente')}</a>`;
+    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(agent.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor(`Contactar a ${agent.nombre || 'el agente'}`))}</a>`;
   } else if (brand?.whatsapp) {
-    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">Contactar por WhatsApp</a>`;
+    primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(brand.whatsapp).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor('Contactar por WhatsApp'))}</a>`;
   }
 
   // Botón único para descargar el PDF de la propiedad.
@@ -748,23 +771,24 @@ function renderCTA(p, agent, brand, record) {
 }
 
 function renderMobileCTA(p, agent, brand) {
-  // Cuando el CTA es un formulario embebido válido, NO mostramos el botón
-  // flotante (el iframe reemplaza el CTA — evita duplicación en mobile).
+  // Cuando el CTA es un formulario/calendario embebido válido, NO mostramos el
+  // botón flotante (el iframe reemplaza el CTA — evita duplicación en mobile).
   if (p.cta_tipo === 'formulario' && p.cta_valor && renderGhlFormEmbed(p.cta_valor)) return '';
+  const customLabel = (p.cta_texto || '').trim();
   // Mismo CTA primario que el sidebar, pero fijo en el bottom.
   let href = '';
   let label = 'Contactar';
   if (p.cta_tipo === 'whatsapp' && p.cta_valor) {
     href = `https://wa.me/${String(p.cta_valor).replace(/[^\d]/g, '')}`;
-    label = 'WhatsApp';
+    label = customLabel || 'WhatsApp';
   } else if (p.cta_tipo === 'redirect' && p.cta_valor) {
-    href = p.cta_valor; label = 'Más información';
+    href = p.cta_valor; label = customLabel || 'Más información';
   } else if (agent?.whatsapp) {
     href = `https://wa.me/${String(agent.whatsapp).replace(/[^\d]/g, '')}`;
-    label = `WhatsApp con ${agent.nombre?.split(' ')[0] || 'el agente'}`;
+    label = customLabel || `WhatsApp con ${agent.nombre?.split(' ')[0] || 'el agente'}`;
   } else if (brand?.whatsapp) {
     href = `https://wa.me/${String(brand.whatsapp).replace(/[^\d]/g, '')}`;
-    label = 'WhatsApp';
+    label = customLabel || 'WhatsApp';
   }
   if (!href) return '';
   return `<div class="mobile-cta"><a class="btn btn-block" href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a></div>`;

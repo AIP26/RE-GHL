@@ -745,3 +745,22 @@ a:hover { text-decoration: underline; }
 .share-controls { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; border-top: 1px solid var(--color-border); }
 .share-actions { display: flex; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); margin-top: 14px; }
 .share-actions .danger { color: var(--color-danger); }
+
+/* CTA GHL asset picker — BLOQUE P1 */
+.cta-mode-tab {
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.cta-mode-tab:hover { color: var(--color-text); }
+.cta-mode-tab.active {
+  background: var(--color-surface, #fff);
+  color: var(--color-primary, #0ea5e9);
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
