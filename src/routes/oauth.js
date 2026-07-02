@@ -76,17 +76,32 @@ r.get('/callback', async (req, res) => {
     // agencia y esperamos a que un agente abra el panel desde una sub-cuenta.
     // En ese momento el SSO mintará el location token on-demand.
     if (companyId) {
-      const agency = await upsertAgencyFromOAuth(tokenResp);
-      console.log('[oauth/callback] agency install ok, companyId=%s agencyId=%s', companyId, agency.id);
-      return res.send(
-        renderHtml(
-          '¡Instalación de agencia lista!',
-          `<p>Conectaste la app <strong>a nivel agencia</strong> (Company).</p>
-           <p><strong>Company ID:</strong> <code>${escapeHtml(companyId)}</code></p>
-           <p>Ahora, dentro de cualquier sub-cuenta donde quieras usar la app, abre <em>Listings</em> desde el menú lateral. La primera vez que un agente entre, activamos automáticamente esa sub-cuenta.</p>
-           <p style="color:#64748b;font-size:14px">No hace falta reinstalar por cada sub-cuenta.</p>`
-        )
-      );
+      try {
+        const agency = await upsertAgencyFromOAuth(tokenResp);
+        console.log('[oauth/callback] agency install ok, companyId=%s agencyId=%s', companyId, agency.id);
+        return res.send(
+          renderHtml(
+            '¡Instalación de agencia lista!',
+            `<p>Conectaste la app <strong>a nivel agencia</strong> (Company).</p>
+             <p><strong>Company ID:</strong> <code>${escapeHtml(companyId)}</code></p>
+             <p>Ahora, dentro de cualquier sub-cuenta donde quieras usar la app, abre <em>Listings</em> desde el menú lateral. La primera vez que un agente entre, activamos automáticamente esa sub-cuenta.</p>
+             <p style="color:#64748b;font-size:14px">No hace falta reinstalar por cada sub-cuenta.</p>`
+          )
+        );
+      } catch (e) {
+        // Caso típico: la migración step15 (tabla `agencies`) no está aplicada.
+        if (e?.code === 'PGRST205' || /agencies/.test(e?.message || '') || /schema cache/.test(e?.message || '')) {
+          console.error('[oauth/callback] agency install falló: tabla `agencies` no existe. Ejecuta sql/migration_step15_agencies.sql');
+          return res.status(500).send(
+            renderHtml(
+              'Instalación incompleta',
+              `<p>Detectamos un install a nivel agencia (companyId=<code>${escapeHtml(companyId)}</code>) pero la base de datos no tiene la tabla <code>agencies</code> creada aún.</p>
+               <p>El administrador de la app debe ejecutar la migración <code>sql/migration_step15_agencies.sql</code> en Supabase antes de reintentar.</p>`
+            )
+          );
+        }
+        throw e;   // dejar que el catch general reporte cualquier otro error
+      }
     }
 
     // Caso C — GHL no devolvió ninguno. Reportamos el shape para diagnóstico.
