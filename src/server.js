@@ -62,6 +62,37 @@ app.use(
     crossOriginEmbedderPolicy: false, // iframe en GHL
   })
 );
+
+// Iframe-embed override para el panel de GHL.
+//
+// helmet setea por defecto `X-Frame-Options: SAMEORIGIN` en toda respuesta,
+// lo que hace que GHL bloquee el iframe del panel ANTES de que app.js corra.
+// Sobrescribimos el header para las rutas del panel (subdominio dedicado
+// `panel.<APP_DOMAIN>` o path `/panel/*`) permitiendo el embed desde los
+// dominios oficiales de GHL + el custom domain del cliente.
+//
+// Importante: este middleware corre DESPUÉS de helmet porque `res.setHeader`
+// sobrescribe el valor previo — si estuviera antes, helmet lo pisaría con
+// SAMEORIGIN cuando se ejecute.
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  const panelHost = env.appDomain ? `panel.${env.appDomain.toLowerCase()}` : null;
+  const isPanel = (panelHost && host === panelHost) || req.path.startsWith('/panel');
+  if (isPanel) {
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    res.setHeader(
+      'Content-Security-Policy',
+      "frame-ancestors 'self' " +
+      "https://*.gohighlevel.com " +
+      "https://*.leadconnectorhq.com " +
+      "https://*.msgsndr.com " +
+      "https://*.highleveldemo.com " +
+      "https://app.thebrokers.info"
+    );
+  }
+  next();
+});
+
 app.use(compression());
 app.use(cors());
 app.use(
