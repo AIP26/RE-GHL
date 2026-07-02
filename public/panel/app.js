@@ -104,7 +104,7 @@
   // -------------------------------------------------------------------
   // Form schema — replica el Master Context v2.6 y matchea ghl-field-ids.json
   // -------------------------------------------------------------------
-  const AMENIDADES = ['Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción'];
+  const AMENIDADES = ['Aire acondicionado','Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción','Cuarto de servicio'];
   const NORMAS = ['Pet friendly','Permite rentas vacacionales','Solo familias','No niños'];
   const MONEDAS = ['USD','MXN','CAD'];
 
@@ -153,14 +153,12 @@
       { key: 'banos_completos', label: 'Baños completos', type: 'number', required: true },
       { key: 'medios_banos', label: 'Medios baños', type: 'number' },
       { key: 'estacionamientos', label: 'Estacionamientos', type: 'number', required: true },
-      { key: 'cuarto_servicio', label: 'Cuarto de servicio', type: 'toggle' },
       { key: 'bodega_storage', label: 'Bodega / Storage', type: 'toggle' },
     ]},
     { title: 'Amenidades', fields: [
       { key: 'amenidades', label: 'Selecciona las amenidades disponibles', type: 'amenities', options: AMENIDADES, full: true },
       { key: 'vista_principal', label: 'Vista principal', type: 'select', options: ['','Calle','Mar','Jardín','Montaña','Ciudad','Laguna','Campo de golf'] },
       { key: 'vista_secundaria', label: 'Vista secundaria', type: 'text' },
-      { key: 'aire_acondicionado', label: 'Aire acondicionado', type: 'toggle' },
     ]},
     { title: 'Situación y conservación', fields: [
       { key: 'situacion_legal', label: 'Situación legal', type: 'select', required: true, options: ['Libre de gravamen','Gravamen hipotecario','Gravamen Infonavit','Otro (consultar)'] },
@@ -229,6 +227,29 @@
   }
 
   // Convierte el record de GHL (+ _collections) -> state del form para edición.
+  //
+  // NOTA (Bloque P0 FIX 2): GHL devuelve los valores de campos SINGLE_OPTIONS
+  // en snake_case lowercase (`departamento`, `libre_de_gravamen`, `mxn`) pero
+  // las opciones del <select> del form están capitalizadas con espacios
+  // (`'Departamento'`, `'Libre de gravamen'`, `'MXN'`). Sin normalizar, el
+  // control no matchea ninguna opción y el dropdown aparece vacío al editar.
+  // Hacemos un lookup case-insensitive contra field.options con normalización
+  // de acentos+snake_case → devolvemos la etiqueta original.
+  function normalizeGhlOptionValue(rawValue, options) {
+    if (!options || !options.length) return rawValue;
+    const norm = (s) => String(s || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip diacríticos
+      .replace(/[_\s-]+/g, ' ')                         // snake_case → space
+      .trim();
+    const rawNorm = norm(rawValue);
+    if (!rawNorm) return rawValue;
+    for (const opt of options) {
+      if (norm(opt) === rawNorm) return opt;
+    }
+    return rawValue;
+  }
+
   function deserializeFromRecord(record, collections) {
     const props = record?.properties || {};
     const state = { _collections: collections || [] };
@@ -245,6 +266,8 @@
           state[f.key] = typeof v === 'string' ? v.split('|').filter(Boolean) : (Array.isArray(v) ? v : []);
         } else if (f.type === 'number') {
           state[f.key] = Number(v);
+        } else if (f.type === 'select') {
+          state[f.key] = normalizeGhlOptionValue(v, f.options);
         } else {
           state[f.key] = v;
         }
@@ -2252,7 +2275,7 @@
             <thead><tr>
               <th></th>
               <th>Título</th>
-              <th>Precio USD</th>
+              <th>Precio</th>
               <th>Estado</th>
               <th>Vistas</th>
               <th>Agente</th>
@@ -2266,6 +2289,16 @@
                 const agt = agentByUserId[p.agente_responsable];
                 const estado = p.estado || 'Disponible';
                 const slug = p.slug_url || rec.id;
+                // Precio: usa moneda_principal + precio_principal si viene; si
+                // no, cae al legacy precio_usd. Cubre MXN/USD/CAD sin mostrar $0.
+                const rawPrincipal = Number(p.precio_principal || 0);
+                const monedaPrincipal = String(p.moneda_principal || '').toUpperCase();
+                const rawLegacyUsd = Number(p.precio_usd || 0);
+                let priceDisplay;
+                if (p.precio_a_consultar) priceDisplay = 'A consultar';
+                else if (rawPrincipal > 0) priceDisplay = (monedaPrincipal || '$') + ' ' + rawPrincipal.toLocaleString();
+                else if (rawLegacyUsd > 0) priceDisplay = 'USD ' + rawLegacyUsd.toLocaleString();
+                else priceDisplay = '—';
                 return html`<tr key=${rec.id} data-testid=${'listing-row-' + rec.id}>
                   <td className="thumb">
                     ${photo ? html`<img src=${photo} alt="" />` : html`<div className="thumb-ph"></div>`}
@@ -2274,7 +2307,7 @@
                     <div className="listing-title">${p.titulo || 'Sin título'}</div>
                     <div className="listing-loc">${[p.colonia, p.ciudad].filter(Boolean).join(', ')}</div>
                   </td>
-                  <td className="listing-price">${p.precio_a_consultar ? 'A consultar' : ('$' + Number(p.precio_usd || 0).toLocaleString())}</td>
+                  <td className="listing-price">${priceDisplay}</td>
                   <td><span className=${'estado-badge estado-' + estado.toLowerCase()}>${estado}</span></td>
                   <td className="listing-views">${viewCounts[rec.id] || 0}</td>
                   <td>${agt?.nombre || '—'}</td>

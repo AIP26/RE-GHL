@@ -26,7 +26,7 @@ function publicShape(row) {
     expira_en: row.expira_en,
     vistas: row.vistas || 0,
     url: `https://${fichaHostname()}/${row.id}`,
-    portal_path: `/ficha/${row.id}`,
+    portal_path: `https://${fichaHostname()}/${row.id}`,
   };
 }
 

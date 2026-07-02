@@ -156,6 +156,27 @@ r.put('/:id', requireSession, requireAdmin, async (req, res) => {
   const update = {};
   for (const k of allowed) if (k in req.body) update[k] = req.body[k];
 
+  // Bloque P0 FIX 8 — Bloquear cambios que dejarían al tenant sin admin activo.
+  // Se dispara cuando la edición desactiva (activo=false) o degrada el rol
+  // (rol != 'admin') de un agente que actualmente sí es admin activo.
+  const wouldDeactivateAdmin = update.activo === false;
+  const wouldDemoteAdmin = 'rol' in update && update.rol !== 'admin';
+  if (wouldDeactivateAdmin || wouldDemoteAdmin) {
+    const { data: current } = await sb
+      .from('agentes').select('rol, activo').eq('id', req.params.id).eq('tenant_id', req.tenant.id).maybeSingle();
+    if (current && current.rol === 'admin' && current.activo) {
+      const { count: activeAdmins } = await sb
+        .from('agentes').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', req.tenant.id).eq('rol', 'admin').eq('activo', true);
+      if ((activeAdmins || 0) <= 1) {
+        return res.status(400).json({
+          error: 'last_admin_protected',
+          message: 'No puedes desactivar al único administrador activo.',
+        });
+      }
+    }
+  }
+
   // Si se está reactivando un agente (activo: true), validar plan limit.
   if (update.activo === true) {
     const { data: current } = await sb

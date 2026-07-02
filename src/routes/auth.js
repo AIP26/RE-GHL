@@ -3,12 +3,13 @@
 // Aquí queda el SSO consumido por el iframe + un endpoint /me protegido
 // para que el front pueda validar sesión y leer el agente actual.
 import { Router } from 'express';
-import { findTenantByLocationId, upsertTenantFromOAuth } from '../lib/tenants.js';
+import { findTenantByLocationId, upsertTenantFromOAuth, getTenantWithTokens } from '../lib/tenants.js';
 import { findAgencyByCompanyId, getAgencyWithTokens, listActiveAgencies } from '../lib/agencies.js';
 import { mintLocationToken } from '../lib/ghl.js';
 import { upsertAgent } from '../lib/agentes.js';
 import { signSession } from '../lib/jwt.js';
 import { requireSession } from '../middleware/auth.js';
+import { ensureCustomObjectForLocation } from '../lib/ensure-custom-object.js';
 
 const r = Router();
 
@@ -28,6 +29,17 @@ async function tryProvisionFromAgency(agencyRow, locationId) {
     });
     console.log('[auth/sso] tenant provisionado agencyId=%s companyId=%s locationId=%s tenantId=%s',
       agencyRow.id, agencyRow.ghl_company_id, locationId, tenant.id);
+    // Bloque P0 FIX 7 — Después de crear el tenant, aseguramos el Custom
+    // Object en esa location. Es idempotente y sólo tarda cuando el schema
+    // no existe (primer agente que abre el panel post-install).
+    try {
+      const t = await getTenantWithTokens(tenant.id);
+      const r = await ensureCustomObjectForLocation(t.access_token, locationId);
+      console.log('[auth/sso] Custom Object provisionado locationId=%s created=%s skipped=%s failed=%s',
+        locationId, r.created, r.skipped, r.failed);
+    } catch (e) {
+      console.error('[auth/sso] ensureCustomObjectForLocation falló:', e?.response?.data || e.message);
+    }
     return tenant;
   } catch (e) {
     // 401/403 = la agency no tiene esa location; 404 = locationId inválido.

@@ -4,11 +4,11 @@
   "folderId": "AG5F4RBZsGpMDnvb5xek",
   "folderName": "Propiedad Info",
   "locationId": "cNg6MFQcxv8bZnwCppoM",
-  "generatedAt": "2026-07-01T21:24:05.620Z",
+  "generatedAt": "2026-07-02T22:26:45.780Z",
   "summary": {
-    "defined": 56,
-    "created": 1,
-    "skipped": 55,
+    "defined": 54,
+    "created": 0,
+    "skipped": 54,
     "failed": 0
   },
   "fields": {
@@ -264,12 +264,6 @@
       "name": "Estacionamientos",
       "dataType": "NUMERICAL"
     },
-    "cuarto_servicio": {
-      "id": "Wb00em9J1DHBOdmX9zRt",
-      "fieldKey": "custom_objects.propiedad.cuarto_servicio",
-      "name": "Cuarto de servicio",
-      "dataType": "CHECKBOX"
-    },
     "bodega_storage": {
       "id": "JuWF1NNRKqvmBnnH6m7i",
       "fieldKey": "custom_objects.propiedad.bodega_storage",
@@ -293,12 +287,6 @@
       "fieldKey": "custom_objects.propiedad.vista_secundaria",
       "name": "Vista secundaria",
       "dataType": "TEXT"
-    },
-    "aire_acondicionado": {
-      "id": "yVdinQ8WnHF2axahxSda",
-      "fieldKey": "custom_objects.propiedad.aire_acondicionado",
-      "name": "Aire acondicionado",
-      "dataType": "CHECKBOX"
     },
     "fotos_urls": {
       "id": "8oQ4SjFadjIMI6Cm48Uw",

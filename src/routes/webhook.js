@@ -13,6 +13,7 @@ import { findTenantByLocationId, getTenantWithTokens, markInactive } from '../li
 import { ensureFirstAdmin } from '../lib/agentes.js';
 import { getUserById } from '../lib/ghl.js';
 import { verifyWebhookSignature } from '../lib/webhook-verify.js';
+import { ensureCustomObjectForLocation } from '../lib/ensure-custom-object.js';
 
 const r = Router();
 
@@ -104,6 +105,22 @@ async function handleInstall({ locationId, userId, payload }) {
     email,
     telefono,
   });
+
+  // Bloque P0 FIX 7 — Provisionar el Custom Object "Propiedad" en la location
+  // recién instalada. El script es idempotente: si el schema o los fields ya
+  // existen (p.ej. re-install), simplemente los skipea. Si falla algún field
+  // seguimos: el agente puede editar la propiedad y GHL rechaza sólo esos.
+  try {
+    const t = await getTenantWithTokens(tenant.id);
+    const res = await ensureCustomObjectForLocation(t.access_token, locationId);
+    console.log(`[webhook] Custom Object provisionado location=${locationId} created=${res.created} skipped=${res.skipped} failed=${res.failed}`);
+  } catch (err) {
+    console.error(`[webhook] ensureCustomObjectForLocation falló location=${locationId}:`, err?.response?.data || err.message);
+    // No lanzamos — el tenant queda creado; el admin puede correr el script
+    // manualmente. La app misma seguirá mostrando "Error cargando propiedades
+    // 404" hasta que el schema exista, pero no bloqueamos el webhook (GHL
+    // reintentaría igual).
+  }
 }
 
 async function handleUninstall({ locationId }) {

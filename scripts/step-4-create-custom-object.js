@@ -83,14 +83,14 @@ const FIELDS = [
   { fieldKey: 'banos_completos',     name: 'Baños completos',           dataType: 'NUMERICAL' },
   { fieldKey: 'medios_banos',        name: 'Medios baños',              dataType: 'NUMERICAL' },
   { fieldKey: 'estacionamientos',    name: 'Estacionamientos',          dataType: 'NUMERICAL' },
-  { fieldKey: 'cuarto_servicio',     name: 'Cuarto de servicio',        dataType: 'CHECKBOX', options: ['Sí'] },
   { fieldKey: 'bodega_storage',      name: 'Bodega o storage',          dataType: 'CHECKBOX', options: ['Sí'] },
 
   // Amenidades
+  // NOTA: `cuarto_servicio` y `aire_acondicionado` fueron eliminados como campos
+  // separados (Bloque P0 FIX 1). Ahora viven como opciones dentro de `amenidades`.
   { fieldKey: 'amenidades',          name: 'Amenidades',                dataType: 'LARGE_TEXT' },
   { fieldKey: 'vista_principal',     name: 'Vista principal',           dataType: 'SINGLE_OPTIONS', options: ['Calle','Mar','Jardín','Montaña','Ciudad','Laguna','Campo de golf'] },
   { fieldKey: 'vista_secundaria',    name: 'Vista secundaria',          dataType: 'TEXT' },
-  { fieldKey: 'aire_acondicionado',  name: 'Aire acondicionado',        dataType: 'CHECKBOX', options: ['Sí'] },
 
   // Situación y conservación (nuevos campos QA bloque 3)
   { fieldKey: 'situacion_legal',     name: 'Situación legal',           dataType: 'SINGLE_OPTIONS', options: ['Libre de gravamen','Gravamen hipotecario','Gravamen Infonavit','Otro (consultar)'] },

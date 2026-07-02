@@ -121,15 +121,23 @@ r.post('/', requireSession, async (req, res) => {
     // Asignar colecciones (si vinieron en _collections)
     if (Array.isArray(body._collections) && body._collections.length) {
       const sb = getSupabase();
-      const rows = body._collections.map((cid) => ({
-        propiedad_id: record.id || record._id,
-        coleccion_id: cid,
-        tenant_id: req.tenant.id,
-      }));
-      await sb.from('propiedades_colecciones').upsert(rows, {
-        onConflict: 'propiedad_id,coleccion_id',
-        ignoreDuplicates: true,
-      });
+      const recId = record?.id || record?._id;
+      if (!recId) {
+        console.error(`[property/create:${reqId}] !! sin recordId en response de GHL — no puedo asignar colecciones`, { keys: Object.keys(record || {}) });
+      } else {
+        const rows = body._collections.map((cid) => ({
+          propiedad_id: recId,
+          coleccion_id: cid,
+          tenant_id: req.tenant.id,
+        }));
+        const { error: colErr, count } = await sb.from('propiedades_colecciones').upsert(rows, {
+          onConflict: 'propiedad_id,coleccion_id',
+          ignoreDuplicates: true,
+          count: 'exact',
+        });
+        if (colErr) console.error(`[property/create:${reqId}] !! error asignando colecciones:`, colErr);
+        else console.log(`[property/create:${reqId}] ✓ colecciones asignadas count=${count ?? rows.length} recordId=${recId} colecciones=${JSON.stringify(body._collections)}`);
+      }
     }
 
     res.json({ ok: true, record, slug });
