@@ -53,6 +53,17 @@ export async function getAgencyWithTokens(agencyId) {
   };
 }
 
+/** Devuelve todas las agencies activas (sin descifrar tokens). */
+export async function listActiveAgencies() {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from(TABLE)
+    .select('id, ghl_company_id, status')
+    .eq('status', 'active');
+  if (error) throw error;
+  return data || [];
+}
+
 /** Persiste tokens refrescados de una agency (cifrándolos). */
 export async function updateAgencyTokens(agencyId, { access_token, refresh_token }) {
   const sb = getSupabase();

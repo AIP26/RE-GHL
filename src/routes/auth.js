@@ -4,7 +4,7 @@
 // para que el front pueda validar sesión y leer el agente actual.
 import { Router } from 'express';
 import { findTenantByLocationId, upsertTenantFromOAuth } from '../lib/tenants.js';
-import { findAgencyByCompanyId, getAgencyWithTokens } from '../lib/agencies.js';
+import { findAgencyByCompanyId, getAgencyWithTokens, listActiveAgencies } from '../lib/agencies.js';
 import { mintLocationToken } from '../lib/ghl.js';
 import { upsertAgent } from '../lib/agentes.js';
 import { signSession } from '../lib/jwt.js';
@@ -13,28 +13,65 @@ import { requireSession } from '../middleware/auth.js';
 const r = Router();
 
 /**
- * Provisiona un tenant on-demand desde un token de agencia.
- * Se usa cuando el admin instaló la app desde el nivel Agency (Company) —
- * en ese momento no había locationId, así que sólo guardamos el token
- * agency. La primera vez que alguien abre el panel desde una sub-cuenta,
- * minteamos el location token y creamos el tenant aquí.
- * Devuelve el tenant creado, o null si companyId no está autorizada.
+ * Intenta mintear un location token para `locationId` usando la agency dada
+ * y persiste el tenant resultante. Devuelve el tenant, o null si el mint
+ * falló (típico: la agency no tiene autorización sobre esa sub-cuenta).
  */
-async function provisionTenantFromAgency(locationId, companyId) {
-  const agency = companyId ? await findAgencyByCompanyId(companyId) : null;
-  if (!agency || agency.status !== 'active') return null;
+async function tryProvisionFromAgency(agencyRow, locationId) {
+  try {
+    const withTokens = await getAgencyWithTokens(agencyRow.id);
+    const minted = await mintLocationToken(withTokens.access_token, agencyRow.ghl_company_id, locationId);
+    const tenant = await upsertTenantFromOAuth({
+      locationId,
+      access_token: minted.access_token,
+      refresh_token: minted.refresh_token,
+    });
+    console.log('[auth/sso] tenant provisionado agencyId=%s companyId=%s locationId=%s tenantId=%s',
+      agencyRow.id, agencyRow.ghl_company_id, locationId, tenant.id);
+    return tenant;
+  } catch (e) {
+    // 401/403 = la agency no tiene esa location; 404 = locationId inválido.
+    // Log breve para observabilidad pero seguimos con la siguiente agency.
+    const status = e?.response?.status;
+    const body = e?.response?.data;
+    console.warn('[auth/sso] mint falló agencyId=%s companyId=%s locationId=%s status=%s body=%s',
+      agencyRow.id, agencyRow.ghl_company_id, locationId, status, body ? JSON.stringify(body).slice(0, 200) : e.message);
+    return null;
+  }
+}
 
-  const withTokens = await getAgencyWithTokens(agency.id);
-  const minted = await mintLocationToken(withTokens.access_token, companyId, locationId);
-  // La respuesta de /oauth/locationToken NO trae locationId de vuelta pero
-  // sí access_token y refresh_token per-location. Persistimos como tenant.
-  const tenant = await upsertTenantFromOAuth({
-    locationId,   // sabemos cuál es porque nosotros lo pedimos
-    access_token: minted.access_token,
-    refresh_token: minted.refresh_token,
-  });
-  console.log('[auth/sso] provisioned tenant on-demand from agency companyId=%s locationId=%s tenantId=%s', companyId, locationId, tenant.id);
-  return tenant;
+/**
+ * Provisiona un tenant on-demand desde alguna agency que tenga acceso.
+ *
+ * Estrategia:
+ *  1. Si viene `companyId` en el request, probamos primero esa agency
+ *     específica (fast path).
+ *  2. Si no viene, o si esa falla, iteramos sobre TODAS las agencies activas
+ *     — la primera que logre mintear el location token gana. Esto cubre el
+ *     caso real (comprobado con logs de Railway) donde el Custom Menu Link
+ *     de GHL entrega `companyId=` vacío pese al placeholder {{company.id}}.
+ *  3. Si ninguna agency puede mintear → null (el caller devolverá 404).
+ */
+async function provisionTenantFromAgency(locationId, companyIdHint) {
+  // Fast path: la agency exacta si la conocemos.
+  if (companyIdHint) {
+    const hint = await findAgencyByCompanyId(companyIdHint);
+    if (hint && hint.status === 'active') {
+      const t = await tryProvisionFromAgency(hint, locationId);
+      if (t) return t;
+    }
+  }
+  // Fallback: probar cada agency activa (típicamente una sola en instalaciones
+  // reales de una app en el Marketplace de un solo cliente).
+  const all = await listActiveAgencies();
+  const candidates = companyIdHint
+    ? all.filter((a) => a.ghl_company_id !== companyIdHint) // ya la probamos
+    : all;
+  for (const a of candidates) {
+    const t = await tryProvisionFromAgency(a, locationId);
+    if (t) return t;
+  }
+  return null;
 }
 
 /**
@@ -43,9 +80,10 @@ async function provisionTenantFromAgency(locationId, companyId) {
  * Mecanismo real de GHL: el iframe recibe locationId y userId como query
  * params (NO un JWT). Aquí emitimos nuestro propio session token.
  *
- * Extensión Marketplace (BLOQUE 15): si el tenant no existe pero conocemos
- * la agencia (companyId), provisionamos el tenant al vuelo mintando un
- * location token desde el agency access_token.
+ * Extensión Marketplace (BLOQUE 15): si el tenant no existe, provisionamos
+ * on-demand mintando un location token desde una agency previamente
+ * autorizada. Funciona incluso si `companyId` llega vacío del Custom Menu
+ * Link — iteramos sobre todas las agencies activas.
  */
 r.get('/sso', async (req, res) => {
   const locationId = String(req.query.locationId || '').trim();
@@ -57,12 +95,11 @@ r.get('/sso', async (req, res) => {
   }
 
   let tenant = await findTenantByLocationId(locationId);
-  if (!tenant && companyId) {
-    // Intentamos provisionar desde la agency que ya autorizó la app.
+  if (!tenant) {
     try {
-      tenant = await provisionTenantFromAgency(locationId, companyId);
+      tenant = await provisionTenantFromAgency(locationId, companyId || null);
     } catch (e) {
-      console.error('[auth/sso] provision failed:', e?.response?.data || e.message);
+      console.error('[auth/sso] provisionTenantFromAgency crashed:', e?.response?.data || e.message);
     }
   }
   if (!tenant) return res.status(404).json({ error: 'tenant_not_found' });
