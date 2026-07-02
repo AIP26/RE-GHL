@@ -107,6 +107,21 @@ app.get(/^\/panel(\/.*)?$/, (req, res, next) => {
   res.sendFile(panelIndex);
 });
 
+// Subdominio dedicado del panel: cuando GHL abre el Custom Menu Link en
+// `panel.<APP_DOMAIN>/?locationId=...&userId=...`, la ruta es `/` (no
+// `/panel/`). Servimos el mismo index.html; los assets (/panel/style.css,
+// /panel/app.js) siguen siendo paths absolutos y funcionan desde cualquier
+// host. Sólo aplica en modo GET `/` para no interferir con otras rutas.
+app.get('/', (req, res, next) => {
+  if (!panelExists) return next();
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  const panelHost = env.appDomain ? `panel.${env.appDomain.toLowerCase()}` : null;
+  if (panelHost && host === panelHost) {
+    return res.sendFile(panelIndex);
+  }
+  next();
+});
+
 // Páginas públicas multi-tenant: se montan en la raíz, resolviendo el tenant
 // por header Host. Se ejecutan después de /api para que las rutas /api/* no
 // caigan aquí.
