@@ -417,37 +417,65 @@ img { max-width: 100%; height: auto; display: block; }
 .mobile-cta .btn { flex: 1; padding: 14px 18px; font-size: 15px; }
 @media (min-width: 900px) { .mobile-cta { display: none; } }
 
-/* GHL Form / Calendar embed (BLOQUE P2 FIX 5).
- *   - Altura máx 600px desktop, 500px mobile
- *   - overflow-y:auto para contener scroll DENTRO del bloque
- *   - heading opcional encima del iframe (cta_texto) */
-.ghl-form-embed { margin-top: 4px; border-radius: 8px; background: #fff; border: 1px solid var(--color-border); }
+/* GHL Form / Calendar embed (BLOQUE P3 FIX 1 + FIX 3).
+ *   - FIX 1: heading premium con color primario, border-left grueso, padding
+ *     generoso — se ve como sección premium con jerarquía visual clara.
+ *   - FIX 3: altura calibrada. Se puede setear via inline
+ *     '--ghl-h: <n>px' en '.ghl-form-embed-inner' (leído del atributo
+ *     data-height del embed legacy si viene). Cap: 600px desktop / 500px
+ *     mobile. Default: 500px. overflow-y: auto para contener scroll. */
+.ghl-form-embed {
+  margin-top: 16px;
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
 .ghl-form-heading {
-  margin: 0; padding: 12px 14px 4px;
-  font-size: 15px; font-weight: 700; letter-spacing: -.01em;
-  color: var(--color-text);
+  margin: 0;
+  padding: 18px 16px 18px 20px;
+  border-left: 4px solid var(--color-primary, #0ea5e9);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-primary, #0ea5e9) 6%, #fff);
+  color: var(--color-primary, #0ea5e9);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -.015em;
+}
+@media (min-width: 768px) {
+  .ghl-form-heading { font-size: 26px; padding: 20px 18px 20px 22px; }
 }
 .ghl-form-embed-inner {
-  max-height: 600px;
+  --ghl-h: 500px;
+  height: min(var(--ghl-h), 500px);
+  max-height: 500px;
   overflow-y: auto;
-  border-radius: 0 0 8px 8px;
   -webkit-overflow-scrolling: touch;
 }
-.ghl-form-embed-inner iframe { display: block; width: 100%; height: 600px; border: 0; }
-@media (max-width: 640px) {
-  .ghl-form-embed-inner { max-height: 500px; }
-  .ghl-form-embed-inner iframe { height: 500px; }
+@media (min-width: 768px) {
+  .ghl-form-embed-inner {
+    height: min(var(--ghl-h), 600px);
+    max-height: 600px;
+  }
 }
+.ghl-form-embed-inner iframe { display: block; width: 100%; height: 100%; border: 0; }
 
-/* PDF button placement (BLOQUE P2 FIX 5).
- *   - Desktop: se muestra al final del sidebar (después del CTA)
- *   - Mobile: se muestra ANTES del iframe del CTA, para que sea visible
- *     sin hacer scroll excesivo */
-.pdf-desktop-only { display: block; }
-.pdf-mobile-only { display: none; }
-@media (max-width: 899px) {
-  .pdf-desktop-only { display: none; }
-  .pdf-mobile-only { display: block; margin-top: 4px; }
+/* PDF button placement (BLOQUE P3 FIX 2 — enfoque robusto vía CSS order).
+ *   - Emitimos UNA sola instancia de "Descargar ficha PDF" con clase
+ *     'pdf-btn' (ver public.js). En mobile queda ANTES del embed vía orden
+ *     natural del DOM. En desktop, 'order: 3' la empuja al final del sidebar
+ *     después del embed ('order: 2').
+ *   - '.agent-card' ya es flex column → el order aplica directamente.
+ *   - Este enfoque no depende de display:none/block que pueden ser
+ *     sobreescritos por otros CSS o extensiones del navegador. */
+.agent-card > .agent-card-top { order: 1; }
+.agent-card > .agent-contact-lines { order: 1; }
+.agent-card > .pdf-btn { order: 2; }
+.agent-card > .ghl-form-embed { order: 3; }
+.agent-card > .btn.btn-block { order: 3; } /* CTA fallback WhatsApp */
+@media (min-width: 768px) {
+  .agent-card > .pdf-btn { order: 4; }
 }
 
 /* Widget WhatsApp flotante */

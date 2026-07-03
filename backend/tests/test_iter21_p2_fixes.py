@@ -44,27 +44,34 @@ def test_public_render_ghl_calendar_id_generates_booking_iframe():
 
 
 def test_public_css_has_new_embed_rules():
-    """El CSS del portal público debe tener max-height 600px/500px y clases
-    pdf-mobile-only / pdf-desktop-only con media queries."""
-    # Verifica el archivo fuente porque el CSS se sirve inline
+    """CSS: max-height 600px desktop / 500px mobile, CSS order-based PDF
+    placement (BLOQUE P3 refactor)."""
     with open('/app/src/lib/render.js') as f:
         css = f.read()
     assert '.ghl-form-embed-inner' in css
     assert 'max-height: 600px' in css
     assert 'max-height: 500px' in css
-    assert '.pdf-mobile-only' in css
-    assert '.pdf-desktop-only' in css
+    # BLOQUE P3 FIX 2 — usamos CSS order en lugar de display:none duplicado.
+    assert '.agent-card > .pdf-btn' in css
+    assert 'order: 2' in css or 'order:2' in css
+    assert 'order: 3' in css or 'order:3' in css
+    assert 'order: 4' in css or 'order:4' in css
     assert 'overflow-y: auto' in css
     assert '.ghl-form-heading' in css
+    # BLOQUE P3 FIX 1 — heading premium
+    assert 'border-left: 4px solid var(--color-primary' in css
 
 
-def test_public_render_emits_dual_pdf_buttons():
+def test_public_render_emits_single_pdf_button():
     with open('/app/src/routes/public.js') as f:
         js = f.read()
-    assert 'pdf-mobile-only' in js
-    assert 'pdf-desktop-only' in js
+    # BLOQUE P3 FIX 2 — un solo pdf-btn (no más duplicación mobile/desktop)
+    assert 'class="btn btn-ghost pdf-btn"' in js
     # cta_texto debe pasarse al render del embed
     assert 'renderGhlFormEmbed(overrideVal, customLabel)' in js
+    # NO deben quedar restos del enfoque anterior
+    assert 'pdf-mobile-only' not in js
+    assert 'pdf-desktop-only' not in js
 
 
 def test_panel_listing_has_ref_column():

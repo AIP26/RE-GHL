@@ -678,7 +678,8 @@ function resolveGhlAssetSrc(value) {
   if (mForm) return { kind: 'form', src: `https://api.leadconnectorhq.com/widget/form/${mForm[1]}` };
   const mCal = s.match(/^ghl-calendar:([A-Za-z0-9_-]{6,64})$/);
   if (mCal) return { kind: 'calendar', src: `https://api.leadconnectorhq.com/widget/booking/${mCal[1]}` };
-  // Legacy: <iframe src="...">
+  // Legacy: <iframe src="...">.  Extraemos también data-height / height si vienen
+  // en el snippet original — GHL suele emitir <iframe data-height="450" ...>.
   const m = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
   if (!m) return null;
   let url;
@@ -686,7 +687,11 @@ function resolveGhlAssetSrc(value) {
   const host = url.hostname.toLowerCase();
   const allowed = GHL_FORM_HOSTS_PUBLIC.some((d) => host === d || host.endsWith('.' + d));
   if (!allowed) return null;
-  return { kind: 'embed', src: m[1] };
+  // BLOQUE P3 FIX 3 — parse data-height / height del embed original (si viene).
+  const heightMatch = s.match(/\sdata-height=["'](\d+)["']/i)
+    || s.match(/\sheight=["'](\d+)["']/i);
+  const height = heightMatch ? Number(heightMatch[1]) : null;
+  return { kind: 'embed', src: m[1], height };
 }
 
 /** Extrae el <iframe> del snippet HTML, valida su host contra la whitelist y
@@ -700,10 +705,15 @@ function renderGhlFormEmbed(value, ctaText) {
   const headerHtml = (ctaText && String(ctaText).trim())
     ? `<h3 class="ghl-form-heading">${esc(String(ctaText).trim())}</h3>`
     : '';
-  // Altura: cap responsive vía CSS (BLOQUE P2 FIX 5) — 600px desktop, 500px mobile.
+  // BLOQUE P3 FIX 3 — Altura con cap responsive:
+  //   · Si el embed legacy trae data-height, usarlo (clampeado por CSS a 500/600 max)
+  //   · Si no, dejamos que CSS use --ghl-h default (500px).
+  //   · Calendarios de GHL suelen requerir ~720px; el CSS los clampeará a 500/600.
+  const hintedHeight = asset.height || (asset.kind === 'calendar' ? 720 : 500);
+  const innerStyle = `--ghl-h:${hintedHeight}px`;
   return `<div class="ghl-form-embed" data-kind="${esc(asset.kind)}">
     ${headerHtml}
-    <div class="ghl-form-embed-inner">
+    <div class="ghl-form-embed-inner" style="${innerStyle}">
       <iframe
         src="${esc(asset.src)}"
         title="${esc(title)}"
@@ -751,16 +761,14 @@ function renderCTA(p, agent, brand, record) {
   // (En el panel `Mis Listings` el agente elige entre las 4 variantes; aquí
   //  simplificamos para que el visitante público tenga UN solo call-to-action.)
   //
-  // BLOQUE P2 FIX 5: renderizamos DOS instancias con clases distintas:
-  //   - `.pdf-mobile-only`  se muestra ANTES del CTA en mobile (visible sin scroll)
-  //   - `.pdf-desktop-only` mantiene la posición actual en desktop
+  // BLOQUE P3 FIX 2 — Un solo botón. El orden dentro de .agent-card lo
+  // maneja CSS (`order: 2` mobile / `order: 4` desktop) — más robusto que
+  // duplicar HTML con display:none.
   const recId = record?.id || '';
-  const pdfBtnHtml = (extraClass) => recId ? `
-    <a class="btn btn-ghost ${extraClass}" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="margin-top:10px" data-testid="portal-pdf-download-btn">
+  const pdfBtn = recId ? `
+    <a class="btn btn-ghost pdf-btn" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" data-testid="portal-pdf-download-btn">
       Descargar ficha PDF
     </a>` : '';
-  const pdfMobile = pdfBtnHtml('pdf-mobile-only');
-  const pdfDesktop = pdfBtnHtml('pdf-desktop-only');
 
   const agentBlock = agent ? `
     <div class="agent-card-top">
@@ -770,15 +778,16 @@ function renderCTA(p, agent, brand, record) {
         <div class="agent-card-rol">${esc(agent.rol === 'admin' ? 'Asesor principal' : 'Asesor')}</div>
       </div>
     </div>
-    ${agent.telefono ? `<a href="tel:${esc(agent.telefono)}" style="font-size:14px;color:var(--color-text)">${esc(agent.telefono)}</a>` : ''}
-    ${agent.email ? `<a href="mailto:${esc(agent.email)}" style="font-size:13px;color:var(--color-text-muted)">${esc(agent.email)}</a>` : ''}
+    ${(agent.telefono || agent.email) ? `<div class="agent-contact-lines" style="display:flex;flex-direction:column;gap:4px">
+      ${agent.telefono ? `<a href="tel:${esc(agent.telefono)}" style="font-size:14px;color:var(--color-text)">${esc(agent.telefono)}</a>` : ''}
+      ${agent.email ? `<a href="mailto:${esc(agent.email)}" style="font-size:13px;color:var(--color-text-muted)">${esc(agent.email)}</a>` : ''}
+    </div>` : ''}
   ` : '';
 
   return `<div class="agent-card">
     ${agentBlock}
-    ${pdfMobile}
+    ${pdfBtn}
     ${primaryHtml}
-    ${pdfDesktop}
   </div>`;
 }
 
