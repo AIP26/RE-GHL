@@ -156,6 +156,33 @@ ${ogUrl ? `<meta property="og:url" content="${esc(ogUrl)}" />` : ''}
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <style>${baseStyles({ primary, secondary, accent })}</style>
+<script>
+// BLOQUE P6 — Compartir la URL actual via Web Share API con fallback a
+// clipboard + toast simple. Vinculado desde onclick="return window.__mktShareCurrent(this)"
+// en los botones .share-btn-mobile emitidos por renderCTA.
+(function() {
+  function showToast(msg) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:9999;background:#0f172a;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:0;transition:opacity .2s ease';
+    document.body.appendChild(t);
+    requestAnimationFrame(function() { t.style.opacity = '1'; });
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2200);
+  }
+  window.__mktShareCurrent = async function(btn) {
+    var url = window.location.href;
+    var title = (btn && btn.getAttribute('data-share-title')) || document.title;
+    var text = (btn && btn.getAttribute('data-share-text')) || 'Mira esta propiedad';
+    if (typeof navigator.share === 'function') {
+      try { await navigator.share({ title: title, text: text, url: url }); return false; }
+      catch (e) { if (e && e.name === 'AbortError') return false; /* fallthrough */ }
+    }
+    try { await navigator.clipboard.writeText(url); showToast('URL copiada ✓'); }
+    catch (e) { showToast('No pude copiar'); }
+    return false;
+  };
+})();
+</script>
 ${ga4 ? `
 <script async src="https://www.googletagmanager.com/gtag/js?id=${esc(ga4)}"></script>
 <script>
@@ -473,8 +500,16 @@ img { max-width: 100%; height: auto; display: block; }
 .agent-card > .agent-card-top { order: 1; }
 .agent-card > .agent-contact-lines { order: 1; }
 .agent-card > .pdf-btn { order: 2; }
+.agent-card > .share-btn-mobile { order: 2; }
 .agent-card > .ghl-form-embed { order: 3; }
 .agent-card > .btn.btn-block { order: 3; } /* CTA fallback WhatsApp */
+
+/* BLOQUE P6 — Botón "Compartir" sólo visible en mobile (< 768px).
+ * Ficheros server-rendered; usamos display:none con media query pura. */
+.share-btn-mobile { display: none; }
+@media (max-width: 767px) {
+  .share-btn-mobile { display: block; }
+}
 
 /* Widget WhatsApp flotante */
 .wa-fab {

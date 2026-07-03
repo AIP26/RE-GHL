@@ -781,6 +781,18 @@ function renderCTA(p, agent, brand, record) {
       Descargar ficha PDF
     </a>` : '';
 
+  // BLOQUE P6 — Botón "Compartir" visible sólo en mobile (< 768px vía CSS).
+  // Handler inline en vanilla JS porque `renderCTA` emite HTML server-side.
+  // Usa navigator.share con fallback a clipboard + toast visual mínimo.
+  const propTitleJs = JSON.stringify(p.titulo || 'Propiedad');
+  const shareBtn = `
+    <button type="button" class="btn btn-ghost share-btn-mobile" data-testid="portal-share-btn"
+      data-share-title=${propTitleJs}
+      data-share-text="Mira esta propiedad"
+      onclick="return window.__mktShareCurrent && window.__mktShareCurrent(this);">
+      Compartir
+    </button>`;
+
   const agentBlock = agent ? `
     <div class="agent-card-top">
       ${agent.foto_url ? `<img src="${esc(agent.foto_url)}" alt="${esc(agent.nombre || '')}" />` : `<div class="ph">${esc((agent.nombre || '?').charAt(0))}</div>`}
@@ -798,6 +810,7 @@ function renderCTA(p, agent, brand, record) {
   return `<div class="agent-card">
     ${agentBlock}
     ${pdfBtn}
+    ${shareBtn}
     ${primaryHtml}
   </div>`;
 }
