@@ -24,7 +24,7 @@ import { decrypt as realDecrypt } from '../lib/encryption.js';
 export const defaultDeps = {
   refreshAccessToken: realGhl.refreshAccessToken,
   mintLocationToken: realGhl.mintLocationToken,
-  listActiveTenants: realTenants.listActiveTenants,
+  listRefreshableTenants: realTenants.listRefreshableTenants,
   updateTenantTokens: realTenants.updateTenantTokens,
   markNeedsReauth: realTenants.markNeedsReauth,
   listActiveAgencies: realAgencies.listActiveAgencies,
@@ -113,14 +113,22 @@ async function refreshAllAgencies(deps, logger) {
  */
 export async function refreshAllTenantTokens({ logger = console, deps = defaultDeps } = {}) {
   const agencyResult = await refreshAllAgencies(deps, logger);
-  const tenants = await deps.listActiveTenants();
-  logger.log(`[refresh-tokens] tenants: procesando ${tenants.length}`);
+  // Iter 23 — Procesamos tenants 'active' Y 'needs_reauth'. Los que están en
+  // needs_reauth son los candidatos objetivo del mint-fallback: si el mint
+  // funciona vía la agency, `updateTenantTokens` los devuelve a 'active' en
+  // la misma llamada (setea status:'active' automáticamente).
+  const tenants = await deps.listRefreshableTenants();
+  const nActive = tenants.filter((t) => t.status === 'active').length;
+  const nReauth = tenants.filter((t) => t.status === 'needs_reauth').length;
+  logger.log(`[refresh-tokens] tenants: procesando ${tenants.length} (active=${nActive} needs_reauth=${nReauth})`);
 
   let ok = 0;
   let mintedFallback = 0;
+  let recoveredFromReauth = 0;
   let failed = 0;
 
   for (const t of tenants) {
+    const wasReauth = t.status === 'needs_reauth';
     // 2.a refresh directo
     let directOk = false;
     try {
@@ -131,10 +139,11 @@ export async function refreshAllTenantTokens({ logger = console, deps = defaultD
         refresh_token: tokenResp.refresh_token,
       });
       ok += 1;
+      if (wasReauth) recoveredFromReauth += 1;
       directOk = true;
     } catch (err) {
       logger.warn(
-        `[refresh-tokens] tenant=${t.id} location=${t.ghl_location_id} refresh directo falló:`,
+        `[refresh-tokens] tenant=${t.id} location=${t.ghl_location_id} status=${t.status} refresh directo falló:`,
         err?.response?.data?.error_description || err?.response?.data || err.message,
       );
     }
@@ -152,6 +161,7 @@ export async function refreshAllTenantTokens({ logger = console, deps = defaultD
       try {
         await deps.updateTenantTokens(t.id, minted);
         mintedFallback += 1;
+        if (wasReauth) recoveredFromReauth += 1;
       } catch (e) {
         logger.error(`[refresh-tokens] tenant=${t.id} updateTenantTokens post-mint:`, e.message);
         await safeMarkNeedsReauth(deps, t.id, logger);
@@ -165,11 +175,12 @@ export async function refreshAllTenantTokens({ logger = console, deps = defaultD
   }
 
   logger.log(
-    `[refresh-tokens] tenants: ok=${ok} mintedFallback=${mintedFallback} failed=${failed} total=${tenants.length}`
+    `[refresh-tokens] tenants: ok=${ok} mintedFallback=${mintedFallback} recoveredFromReauth=${recoveredFromReauth} failed=${failed} total=${tenants.length}`
   );
   return {
     ok,
     mintedFallback,
+    recoveredFromReauth,
     failed,
     total: tenants.length,
     agencies: { ok: agencyResult.ok, failed: agencyResult.failed, total: agencyResult.total },

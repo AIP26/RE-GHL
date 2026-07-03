@@ -53,13 +53,40 @@ export async function getTenantWithTokens(tenantId) {
   };
 }
 
-/** Devuelve todos los tenants activos (sin tokens descifrados).
+/** Devuelve todos los tenants **procesables por el cron de refresh**:
+ *  `status IN ('active', 'needs_reauth')`.
+ *
+ *  Iter 23 — Antes filtraba sólo por 'active', lo que excluía a los tenants
+ *  en 'needs_reauth' — precisamente el escenario donde el mint-fallback
+ *  vía agency debería intentar rescatarlos. Ahora el cron los procesa;
+ *  `updateTenantTokens` los devuelve a 'active' automáticamente si el
+ *  fallback tuvo éxito.
+ *
  *  Incluye `agency_id` cuando la columna existe (post migration_step19).
  *  Si la columna no existe todavía, cae a la lista básica sin agency_id. */
+export async function listRefreshableTenants() {
+  const sb = getSupabase();
+  const REFRESHABLE = ['active', 'needs_reauth'];
+  let { data, error } = await sb
+    .from(TABLE)
+    .select('id, ghl_location_id, oauth_token, refresh_token, status, agency_id')
+    .in('status', REFRESHABLE);
+  if (error && /agency_id/.test(error.message || '')) {
+    const fallback = await sb
+      .from(TABLE)
+      .select('id, ghl_location_id, oauth_token, refresh_token, status')
+      .in('status', REFRESHABLE);
+    if (fallback.error) throw fallback.error;
+    return (fallback.data || []).map((r) => ({ ...r, agency_id: null }));
+  }
+  if (error) throw error;
+  return data;
+}
+
+/** @deprecated Sólo por compat con scripts smoke. Usa listRefreshableTenants
+ *  para el cron. Este devuelve únicamente 'active'. */
 export async function listActiveTenants() {
   const sb = getSupabase();
-  // Intentamos primero con agency_id. Si la columna aún no existe (migración
-  // step19 no aplicada), Supabase retorna error y hacemos fallback silencioso.
   let { data, error } = await sb
     .from(TABLE)
     .select('id, ghl_location_id, oauth_token, refresh_token, status, agency_id')

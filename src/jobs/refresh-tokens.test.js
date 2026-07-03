@@ -21,7 +21,7 @@ function buildDeps({ tenants = [], agencies = [], ghl = {} } = {}) {
     mintLocationToken: ghl.mint || (async () => { throw new Error('mock: mint not stubbed'); }),
 
     // Tenants
-    listActiveTenants: async () => state.tenants,
+    listRefreshableTenants: async () => state.tenants,
     updateTenantTokens: async (id, tokens) => { state.tenantUpdates[id] = tokens; },
     markNeedsReauth: async (id) => { state.needsReauth.push(id); },
 
@@ -220,4 +220,59 @@ test('(vii extra) prioridad de agency por FK — agency_id se prueba primero', a
   const result = await refreshAllTenantTokens({ logger: silentLogger, deps });
   assert.equal(result.mintedFallback, 1);
   assert.equal(firstMintAgencyId, 'COMP2', 'agency FK-linked debe ser la primera intentada');
+});
+
+test('(viii Iter 23) tenant en needs_reauth se rescata vía mint y vuelve a active', async () => {
+  // Escenario real del bug de Iter 23: el tenant está status='needs_reauth'
+  // desde el arranque. El cron nuevo debe procesarlo (listRefreshableTenants),
+  // fallar el refresh directo, tener éxito con mint via agency, y regresarlo
+  // a status='active' (updateTenantTokens setea status automáticamente —
+  // aquí solo verificamos el conteo `recoveredFromReauth`).
+  const { deps, state } = buildDeps({
+    tenants: [{
+      id: 'T-STUCK', ghl_location_id: 'LOC-STUCK', oauth_token: 'AT', refresh_token: 'RT',
+      status: 'needs_reauth', agency_id: 'A1',
+    }],
+    agencies: [{ id: 'A1', ghl_company_id: 'COMP1', access_token: 'AAT', refresh_token: 'ART' }],
+    ghl: {
+      refresh: async (rt) => {
+        if (rt === 'ART') return { access_token: 'AAT-new', refresh_token: 'ART-new' };
+        // Tenant refresh_token está muerto (por eso estaba needs_reauth)
+        const err = new Error('u'); err.response = { status: 401, data: { error_description: 'Invalid refresh token' } }; throw err;
+      },
+      mint: async (at, cid, lid) => {
+        return { access_token: 'RESCUED-AT', refresh_token: 'RESCUED-RT' };
+      },
+    },
+  });
+  const result = await refreshAllTenantTokens({ logger: silentLogger, deps });
+  assert.equal(result.mintedFallback, 1, 'mint fallback debió ejecutarse');
+  assert.equal(result.recoveredFromReauth, 1, 'debió contar como recuperado de needs_reauth');
+  assert.equal(result.failed, 0);
+  assert.deepEqual(state.tenantUpdates['T-STUCK'], { access_token: 'RESCUED-AT', refresh_token: 'RESCUED-RT' });
+  assert.deepEqual(state.needsReauth, []);
+});
+
+test('(ix Iter 23) tenant active y needs_reauth en el mismo run se procesan ambos', async () => {
+  const { deps, state } = buildDeps({
+    tenants: [
+      { id: 'T-ACTIVE', ghl_location_id: 'LOC-A', oauth_token: 'AT-A', refresh_token: 'RT-A', status: 'active', agency_id: null },
+      { id: 'T-REAUTH', ghl_location_id: 'LOC-R', oauth_token: 'AT-R', refresh_token: 'RT-R', status: 'needs_reauth', agency_id: 'A1' },
+    ],
+    agencies: [{ id: 'A1', ghl_company_id: 'C1', access_token: 'AAT', refresh_token: 'ART' }],
+    ghl: {
+      refresh: async (rt) => {
+        if (rt === 'ART') return { access_token: 'AAT-new', refresh_token: 'ART-new' };
+        if (rt === 'RT-A') return { access_token: 'AT-A-new', refresh_token: 'RT-A-new' };
+        // RT-R muerto → cae al fallback
+        const err = new Error('u'); err.response = { status: 401 }; throw err;
+      },
+      mint: async () => ({ access_token: 'RESCUED', refresh_token: 'RESCUED-RT' }),
+    },
+  });
+  const result = await refreshAllTenantTokens({ logger: silentLogger, deps });
+  assert.equal(result.ok, 1);              // T-ACTIVE
+  assert.equal(result.mintedFallback, 1);  // T-REAUTH
+  assert.equal(result.recoveredFromReauth, 1);  // sólo T-REAUTH cuenta como recuperado
+  assert.equal(result.total, 2);
 });
