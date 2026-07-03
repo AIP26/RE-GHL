@@ -77,6 +77,36 @@
     return res.status === 204 ? null : res.json();
   }
 
+  // Fetch autenticado que descarga un archivo (blob) en el navegador.
+  // Necesario para endpoints protegidos con Bearer que no pueden usar <a href>
+  // (el navegador no inyecta Authorization en navegación directa).
+  async function apiDownload(path, filename) {
+    const doFetch = async () => {
+      const headers = { 'Accept': '*/*' };
+      if (_token) headers['Authorization'] = 'Bearer ' + _token;
+      return fetch(API + path, { headers });
+    };
+    let res = await doFetch();
+    if (res.status === 401) {
+      const ok = await reAuthFromUrl();
+      if (ok) res = await doFetch();
+    }
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try { const j = await res.json(); msg = j.message || j.error || msg; } catch {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'download';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   // -------------------------------------------------------------------
   // Toast (mini)
   // -------------------------------------------------------------------
@@ -2623,6 +2653,7 @@
     >
       <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener" data-testid=${'listing-view-' + rec.id}>Ver propiedad</a>
       <button onClick=${onShareProperty} data-testid=${'listing-share-property-' + rec.id}>Compartir</button>
+      <button onClick=${() => apiDownload('/property/' + rec.id + '/flyer?version=client', 'flyer-' + (slug || rec.id) + '-client.jpg').catch((e) => toast(e.message || 'No pude generar el flyer', 'error'))} data-testid=${'listing-flyer-' + rec.id}>Crear flyer</button>
       <button onClick=${onEdit} data-testid=${'listing-edit-' + rec.id}>Editar</button>
       <button onClick=${onDuplicate} data-testid=${'listing-duplicate-' + rec.id}>Duplicar propiedad</button>
       <button onClick=${onChangeAgent} data-testid=${'listing-change-agent-' + rec.id}>Cambiar agente</button>
@@ -2733,14 +2764,15 @@
       catch { toast('No pude copiar', 'error'); }
     };
 
-    // BLOQUE P5 FEATURE 1 — Compartir la URL orgánica via Web Share API.
-    const shareOrganic = () => {
-      if (!ficha?.url) return;
-      webShareOrCopy({
-        url: ficha.url,
-        title: property?.properties?.titulo || 'Propiedad',
-        text: 'Te comparto esta propiedad',
-      });
+    // BLOQUE Iter 27 — El botón "Compartir" del modal fue reemplazado por
+    // "Flyer orgánico" (descarga JPEG 1000×1000 sin logo/whatsapp). El
+    // share de URL sigue disponible en el row menu (P5) y en el portal
+    // mobile (P6) — este botón ahora sirve a un propósito distinto.
+    const downloadOrganicFlyer = () => {
+      if (!property?.id) return;
+      const slug = property?.properties?.slug_url || property.id;
+      apiDownload('/property/' + property.id + '/flyer?version=organic', 'flyer-' + slug + '-organic.jpg')
+        .catch((e) => toast(e.message || 'No pude generar el flyer', 'error'));
     };
 
     return html`<div className="modal-backdrop" onClick=${onClose}>
@@ -2769,7 +2801,7 @@
               <div className="share-url-row">
                 <code data-testid="share-url">${ficha.url}</code>
                 <button className="btn btn-ghost" onClick=${copyUrl} data-testid="share-copy-btn">Copiar</button>
-                <button className="btn btn-primary" onClick=${shareOrganic} data-testid="share-native-btn">Compartir</button>
+                <button className="btn btn-primary" onClick=${downloadOrganicFlyer} data-testid="organic-flyer-btn">Flyer orgánico</button>
               </div>
               <div className="share-stats">
                 <span><strong>${ficha.vistas}</strong> vista${ficha.vistas === 1 ? '' : 's'}</span>

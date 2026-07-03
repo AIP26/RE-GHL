@@ -488,4 +488,58 @@ async function generateUniqueSlug(tenantId, titulo) {
   sb; tenantId;
 }
 
+// ---------------------------------------------------------------------
+// GET /api/property/:id/flyer?version=client|organic
+// Genera un JPEG 1000×1000 para redes / WhatsApp. Ver src/lib/flyer.js.
+// ---------------------------------------------------------------------
+r.get('/:id/flyer', requireSession, async (req, res) => {
+  try {
+    const version = req.query.version === 'organic' ? 'organic' : 'client';
+    const fieldIds = getFieldIds();
+    const t = await getTenantWithTokens(req.tenant.id);
+
+    const record = await getObjectRecord(
+      t.access_token, fieldIds.objectKey, req.params.id, req.tenant.ghl_location_id,
+    );
+    const property = record?.properties || {};
+    // fotos_urls es "url1|url2|url3" (GHL Custom Field tipo LARGE_TEXT).
+    const fotos = String(property.fotos_urls || '').split('|').map((s) => s.trim()).filter(Boolean);
+    if (fotos.length === 0) {
+      return res.status(400).json({ error: 'no_main_photo', message: 'La propiedad no tiene foto principal.' });
+    }
+
+    // Traer marca + agente en paralelo (silencioso si falla)
+    const sb = getSupabase();
+    const [{ data: brand }, { data: agente }] = await Promise.all([
+      sb.from('configuracion_marca').select('color_principal, logo_url')
+        .eq('tenant_id', req.tenant.id).maybeSingle(),
+      property.agente_responsable
+        ? sb.from('agentes').select('whatsapp')
+            .eq('tenant_id', req.tenant.id).eq('ghl_user_id', property.agente_responsable).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const { generateFlyer } = await import('../lib/flyer.js');
+    const buf = await generateFlyer({
+      property,
+      brand: brand || null,
+      agent: agente || null,
+      version,
+      photoUrl: fotos[0],
+    });
+
+    const filename = `flyer-${property.slug_url || req.params.id}-${version}.jpg`;
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(buf);
+  } catch (err) {
+    console.error('[property/flyer]', err?.message || err);
+    if (err?.message === 'missing_main_photo' || err?.message === 'photo_download_failed') {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'flyer_generation_failed', detail: err?.message });
+  }
+});
+
 export default r;
