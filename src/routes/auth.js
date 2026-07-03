@@ -3,7 +3,7 @@
 // Aquí queda el SSO consumido por el iframe + un endpoint /me protegido
 // para que el front pueda validar sesión y leer el agente actual.
 import { Router } from 'express';
-import { findTenantByLocationId, upsertTenantFromOAuth, getTenantWithTokens } from '../lib/tenants.js';
+import { findTenantByLocationId, upsertTenantFromOAuth, getTenantWithTokens, linkTenantToAgency } from '../lib/tenants.js';
 import { findAgencyByCompanyId, getAgencyWithTokens, listActiveAgencies } from '../lib/agencies.js';
 import { mintLocationToken } from '../lib/ghl.js';
 import { upsertAgent } from '../lib/agentes.js';
@@ -27,6 +27,12 @@ async function tryProvisionFromAgency(agencyRow, locationId) {
       access_token: minted.access_token,
       refresh_token: minted.refresh_token,
     });
+    // FIX (Iter 20): guardamos el vínculo tenant→agency para que el cron
+    // pueda re-mintear el location token desde la agency cuando el refresh
+    // directo falle (típico: "Invalid client credentials" cuando el token
+    // fue mintado por la agency y no via el flujo OAuth estándar).
+    try { await linkTenantToAgency(tenant.id, agencyRow.id); }
+    catch (e) { console.warn('[auth/sso] linkTenantToAgency falló (no fatal):', e.message); }
     console.log('[auth/sso] tenant provisionado agencyId=%s companyId=%s locationId=%s tenantId=%s',
       agencyRow.id, agencyRow.ghl_company_id, locationId, tenant.id);
     // Bloque P0 FIX 7 — Después de crear el tenant, aseguramos el Custom

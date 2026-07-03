@@ -53,15 +53,42 @@ export async function getTenantWithTokens(tenantId) {
   };
 }
 
-/** Devuelve todos los tenants activos (sin tokens descifrados). */
+/** Devuelve todos los tenants activos (sin tokens descifrados).
+ *  Incluye `agency_id` cuando la columna existe (post migration_step19).
+ *  Si la columna no existe todavía, cae a la lista básica sin agency_id. */
 export async function listActiveTenants() {
   const sb = getSupabase();
-  const { data, error } = await sb
+  // Intentamos primero con agency_id. Si la columna aún no existe (migración
+  // step19 no aplicada), Supabase retorna error y hacemos fallback silencioso.
+  let { data, error } = await sb
     .from(TABLE)
-    .select('id, ghl_location_id, oauth_token, refresh_token, status')
+    .select('id, ghl_location_id, oauth_token, refresh_token, status, agency_id')
     .eq('status', 'active');
+  if (error && /agency_id/.test(error.message || '')) {
+    const fallback = await sb
+      .from(TABLE)
+      .select('id, ghl_location_id, oauth_token, refresh_token, status')
+      .eq('status', 'active');
+    if (fallback.error) throw fallback.error;
+    return (fallback.data || []).map((r) => ({ ...r, agency_id: null }));
+  }
   if (error) throw error;
   return data;
+}
+
+/** Asocia un tenant con la agency que lo aprovisionó. Best-effort: si la
+ *  columna agency_id no existe todavía (migración pendiente) simplemente
+ *  loguea y sigue — el cron cae a iteración sobre agencies activas. */
+export async function linkTenantToAgency(tenantId, agencyId) {
+  const sb = getSupabase();
+  const { error } = await sb.from(TABLE).update({ agency_id: agencyId }).eq('id', tenantId);
+  if (error) {
+    if (/agency_id/.test(error.message || '')) {
+      console.warn('[tenants.linkTenantToAgency] columna agency_id no existe (aplicar sql/migration_step19_tenant_agency_link.sql). Continúo sin link.');
+      return;
+    }
+    throw error;
+  }
 }
 
 /** Persiste tokens refrescados (cifrándolos). */
