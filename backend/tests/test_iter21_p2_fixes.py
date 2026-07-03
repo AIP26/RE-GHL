@@ -44,19 +44,16 @@ def test_public_render_ghl_calendar_id_generates_booking_iframe():
 
 
 def test_public_css_has_new_embed_rules():
-    """CSS: max-height 600px desktop / 500px mobile, CSS order-based PDF
-    placement (BLOQUE P3 refactor)."""
+    """CSS del embed. P4 quitó max-height clamp — ahora overflow:hidden +
+    iframe min-height 650/780 sin cap. FIX 2 mantiene CSS order-based PDF."""
     with open('/app/src/lib/render.js') as f:
         css = f.read()
     assert '.ghl-form-embed-inner' in css
-    assert 'max-height: 600px' in css
-    assert 'max-height: 500px' in css
-    # BLOQUE P3 FIX 2 — usamos CSS order en lugar de display:none duplicado.
-    assert '.agent-card > .pdf-btn' in css
-    assert 'order: 2' in css or 'order:2' in css
-    assert 'order: 3' in css or 'order:3' in css
-    assert 'order: 4' in css or 'order:4' in css
-    assert 'overflow-y: auto' in css
+    assert 'overflow: hidden' in css
+    assert 'min-height: 650px' in css
+    # BLOQUE P4 FIX 2 — order:2 en TODOS los viewports (mobile + desktop)
+    assert '.agent-card > .pdf-btn { order: 2; }' in css
+    assert '.agent-card > .ghl-form-embed { order: 3; }' in css
     assert '.ghl-form-heading' in css
     # BLOQUE P3 FIX 1 — heading premium
     assert 'border-left: 4px solid var(--color-primary' in css

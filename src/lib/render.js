@@ -150,6 +150,8 @@ ${description ? `<meta property="og:description" content="${esc(description)}" /
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
 ${ogUrl ? `<meta property="og:url" content="${esc(ogUrl)}" />` : ''}
 <meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <style>${baseStyles({ primary, secondary, accent })}</style>
 ${ga4 ? `
@@ -417,19 +419,20 @@ img { max-width: 100%; height: auto; display: block; }
 .mobile-cta .btn { flex: 1; padding: 14px 18px; font-size: 15px; }
 @media (min-width: 900px) { .mobile-cta { display: none; } }
 
-/* GHL Form / Calendar embed (BLOQUE P3 FIX 1 + FIX 3).
- *   - FIX 1: heading premium con color primario, border-left grueso, padding
- *     generoso — se ve como sección premium con jerarquía visual clara.
- *   - FIX 3: altura calibrada. Se puede setear via inline
- *     '--ghl-h: <n>px' en '.ghl-form-embed-inner' (leído del atributo
- *     data-height del embed legacy si viene). Cap: 600px desktop / 500px
- *     mobile. Default: 500px. overflow-y: auto para contener scroll. */
+/* GHL Form / Calendar embed (BLOQUE P4 FIX 1 — sin scrollbars).
+ *   - Iter previa clampeaba a 500/600 con overflow-y: auto → scrollbars
+ *     visibles cuando el widget de GHL era más alto que el cap. Nuevo
+ *     enfoque: contenedor overflow:hidden, iframe con min-height 650px
+ *     que se expande según el widget. El scroll natural de la página
+ *     es suficiente — el visitante ya está en modo scroll vertical de
+ *     la ficha completa. */
 .ghl-form-embed {
   margin-top: 16px;
   border-radius: 10px;
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  width: 100%;
 }
 .ghl-form-heading {
   margin: 0;
@@ -447,36 +450,29 @@ img { max-width: 100%; height: auto; display: block; }
   .ghl-form-heading { font-size: 26px; padding: 20px 18px 20px 22px; }
 }
 .ghl-form-embed-inner {
-  --ghl-h: 500px;
-  height: min(var(--ghl-h), 500px);
-  max-height: 500px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  width: 100%;
+  display: block;
 }
-@media (min-width: 768px) {
-  .ghl-form-embed-inner {
-    height: min(var(--ghl-h), 600px);
-    max-height: 600px;
-  }
+.ghl-form-embed-inner iframe {
+  display: block;
+  width: 100% !important;
+  border: 0;
+  min-height: 650px;
 }
-.ghl-form-embed-inner iframe { display: block; width: 100%; height: 100%; border: 0; }
+/* Calendarios GHL suelen necesitar más alto que forms simples. */
+.ghl-form-embed[data-kind="calendar"] .ghl-form-embed-inner iframe { min-height: 780px; }
 
-/* PDF button placement (BLOQUE P3 FIX 2 — enfoque robusto vía CSS order).
- *   - Emitimos UNA sola instancia de "Descargar ficha PDF" con clase
- *     'pdf-btn' (ver public.js). En mobile queda ANTES del embed vía orden
- *     natural del DOM. En desktop, 'order: 3' la empuja al final del sidebar
- *     después del embed ('order: 2').
- *   - '.agent-card' ya es flex column → el order aplica directamente.
- *   - Este enfoque no depende de display:none/block que pueden ser
- *     sobreescritos por otros CSS o extensiones del navegador. */
+/* PDF button placement (BLOQUE P4 FIX 2 — antes del embed en TODOS los viewports).
+ *   Iter previa (P3) ponía PDF en order:4 en desktop → aparecía DEBAJO del
+ *   embed. El agente quería el PDF visible sin scrollear el calendario, por
+ *   eso ahora lo dejamos en order:2 tanto en mobile como desktop (entre
+ *   datos del agente order:1 y embed order:3). */
 .agent-card > .agent-card-top { order: 1; }
 .agent-card > .agent-contact-lines { order: 1; }
 .agent-card > .pdf-btn { order: 2; }
 .agent-card > .ghl-form-embed { order: 3; }
 .agent-card > .btn.btn-block { order: 3; } /* CTA fallback WhatsApp */
-@media (min-width: 768px) {
-  .agent-card > .pdf-btn { order: 4; }
-}
 
 /* Widget WhatsApp flotante */
 .wa-fab {

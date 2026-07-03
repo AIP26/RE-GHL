@@ -130,6 +130,24 @@ if (!panelExists) {
 }
 
 app.use('/panel', express.static(panelDir, { index: 'index.html', extensions: ['html'], fallthrough: true }));
+
+// Favicon + apple-touch-icon (BLOQUE P4 FIX 3).
+//   El navegador pide /favicon.ico automáticamente en cada visita — sin
+//   este handler produce 404 ruidosos en los logs. El asset es un ICO
+//   multi-size (16/32/48) con "MLS" blanco sobre fondo #1a1a2e.
+//   Usamos rutas explícitas (no express.static bajo '/') para evitar
+//   colisiones con el resolveTenantByHost que corre después.
+const publicRoot = path.resolve(REPO_ROOT, 'public');
+app.get('/favicon.ico', (_req, res) => {
+  res.sendFile(path.join(publicRoot, 'favicon.ico'), {
+    headers: { 'Cache-Control': 'public, max-age=86400' },
+  }, (err) => { if (err) res.status(404).end(); });
+});
+app.get('/apple-touch-icon.png', (_req, res) => {
+  res.sendFile(path.join(publicRoot, 'apple-touch-icon.png'), {
+    headers: { 'Cache-Control': 'public, max-age=86400' },
+  }, (err) => { if (err) res.status(404).end(); });
+});
 // Fallback SPA: cualquier ruta bajo /panel/* que NO matchee un archivo estático
 // devuelve index.html para que el routing del SPA (hash-based) funcione tras
 // refresh o deep-link.

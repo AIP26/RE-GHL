@@ -705,21 +705,19 @@ function renderGhlFormEmbed(value, ctaText) {
   const headerHtml = (ctaText && String(ctaText).trim())
     ? `<h3 class="ghl-form-heading">${esc(String(ctaText).trim())}</h3>`
     : '';
-  // BLOQUE P3 FIX 3 — Altura con cap responsive:
-  //   · Si el embed legacy trae data-height, usarlo (clampeado por CSS a 500/600 max)
-  //   · Si no, dejamos que CSS use --ghl-h default (500px).
-  //   · Calendarios de GHL suelen requerir ~720px; el CSS los clampeará a 500/600.
-  const hintedHeight = asset.height || (asset.kind === 'calendar' ? 720 : 500);
-  const innerStyle = `--ghl-h:${hintedHeight}px`;
+  // BLOQUE P4 FIX 1 — Sin scrollbars: contenedor con overflow:hidden,
+  // iframe con min-height 650px (780px calendarios) que se expande según
+  // el widget. Data-kind se usa por CSS para elegir el min-height correcto.
   return `<div class="ghl-form-embed" data-kind="${esc(asset.kind)}">
     ${headerHtml}
-    <div class="ghl-form-embed-inner" style="${innerStyle}">
+    <div class="ghl-form-embed-inner">
       <iframe
         src="${esc(asset.src)}"
         title="${esc(title)}"
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade"
         sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+        scrolling="no"
       ></iframe>
     </div>
   </div>`;
