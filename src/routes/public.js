@@ -692,21 +692,26 @@ function resolveGhlAssetSrc(value) {
 /** Extrae el <iframe> del snippet HTML, valida su host contra la whitelist y
  *  devuelve un HTML seguro con `sandbox` permisivo suficiente para GHL Forms.
  *  Si el snippet no es válido devuelve '' (el caller cae a fallback). */
-function renderGhlFormEmbed(value) {
+function renderGhlFormEmbed(value, ctaText) {
   const asset = resolveGhlAssetSrc(value);
   if (!asset) return '';
-  // Calendarios GHL requieren un poco más de alto (agenda + slots).
-  const height = asset.kind === 'calendar' ? 720 : 600;
   const title = asset.kind === 'calendar' ? 'Agenda una cita' : 'Formulario de contacto';
-  return `<div class="ghl-form-embed">
-    <iframe
-      src="${esc(asset.src)}"
-      title="${esc(title)}"
-      loading="lazy"
-      referrerpolicy="no-referrer-when-downgrade"
-      sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-      style="width:100%;height:${height}px;border:0;display:block"
-    ></iframe>
+  // Heading opcional: sólo mostramos si el user configuró cta_texto (BLOQUE P2 FIX 1).
+  const headerHtml = (ctaText && String(ctaText).trim())
+    ? `<h3 class="ghl-form-heading">${esc(String(ctaText).trim())}</h3>`
+    : '';
+  // Altura: cap responsive vía CSS (BLOQUE P2 FIX 5) — 600px desktop, 500px mobile.
+  return `<div class="ghl-form-embed" data-kind="${esc(asset.kind)}">
+    ${headerHtml}
+    <div class="ghl-form-embed-inner">
+      <iframe
+        src="${esc(asset.src)}"
+        title="${esc(title)}"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+      ></iframe>
+    </div>
   </div>`;
 }
 
@@ -722,7 +727,7 @@ function renderCTA(p, agent, brand, record) {
   if (overrideType === 'whatsapp' && overrideVal) {
     primaryHtml = `<a class="btn btn-block" href="https://wa.me/${esc(String(overrideVal).replace(/[^\d]/g, ''))}" target="_blank" rel="noopener">${esc(labelFor('Contactar por WhatsApp'))}</a>`;
   } else if (overrideType === 'formulario' && overrideVal) {
-    primaryHtml = renderGhlFormEmbed(overrideVal);
+    primaryHtml = renderGhlFormEmbed(overrideVal, customLabel);
     // Si el snippet no es válido, `renderGhlFormEmbed` devuelve '' y caemos al
     // fallback global más abajo (widget de contacto / whatsapp).
     if (!primaryHtml) {
@@ -745,11 +750,17 @@ function renderCTA(p, agent, brand, record) {
   // — es el fact-sheet más completo, útil para compartir con leads.
   // (En el panel `Mis Listings` el agente elige entre las 4 variantes; aquí
   //  simplificamos para que el visitante público tenga UN solo call-to-action.)
+  //
+  // BLOQUE P2 FIX 5: renderizamos DOS instancias con clases distintas:
+  //   - `.pdf-mobile-only`  se muestra ANTES del CTA en mobile (visible sin scroll)
+  //   - `.pdf-desktop-only` mantiene la posición actual en desktop
   const recId = record?.id || '';
-  const pdfPicker = recId ? `
-    <a class="btn btn-ghost" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="margin-top:10px" data-testid="portal-pdf-download-btn">
+  const pdfBtnHtml = (extraClass) => recId ? `
+    <a class="btn btn-ghost ${extraClass}" href="/p/${esc(p.slug_url || recId)}/pdf?v=con-agente-2pag" style="margin-top:10px" data-testid="portal-pdf-download-btn">
       Descargar ficha PDF
     </a>` : '';
+  const pdfMobile = pdfBtnHtml('pdf-mobile-only');
+  const pdfDesktop = pdfBtnHtml('pdf-desktop-only');
 
   const agentBlock = agent ? `
     <div class="agent-card-top">
@@ -765,15 +776,16 @@ function renderCTA(p, agent, brand, record) {
 
   return `<div class="agent-card">
     ${agentBlock}
+    ${pdfMobile}
     ${primaryHtml}
-    ${pdfPicker}
+    ${pdfDesktop}
   </div>`;
 }
 
 function renderMobileCTA(p, agent, brand) {
   // Cuando el CTA es un formulario/calendario embebido válido, NO mostramos el
   // botón flotante (el iframe reemplaza el CTA — evita duplicación en mobile).
-  if (p.cta_tipo === 'formulario' && p.cta_valor && renderGhlFormEmbed(p.cta_valor)) return '';
+  if (p.cta_tipo === 'formulario' && p.cta_valor && renderGhlFormEmbed(p.cta_valor, p.cta_texto)) return '';
   const customLabel = (p.cta_texto || '').trim();
   // Mismo CTA primario que el sidebar, pero fijo en el bottom.
   let href = '';

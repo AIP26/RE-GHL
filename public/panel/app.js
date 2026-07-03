@@ -794,7 +794,16 @@
             const d = await api('/ghl/forms');
             if (!cancelled) setForms(d.items || []);
           } catch (e) {
-            if (!cancelled) { setForms([]); setLoadErr('No se pudieron cargar los formularios de GHL.'); }
+            if (!cancelled) {
+              setForms([]);
+              // BLOQUE P2 FIX 3 — mensaje explícito cuando el error es scope missing
+              const code = e?.detail?.error || e?.detail?.code;
+              if (code === 'scope_missing') {
+                setLoadErr('El app instalado no tiene permiso para leer formularios. Contacta al admin de la agencia para actualizar los scopes (forms.readonly) en el listing del Marketplace y reinstalar.');
+              } else {
+                setLoadErr('No se pudieron cargar los formularios de GHL.');
+              }
+            }
           } finally { if (!cancelled) setLoading(false); }
         } else if (mode === 'calendar' && calendars == null) {
           setLoading(true);
@@ -802,7 +811,15 @@
             const d = await api('/ghl/calendars');
             if (!cancelled) setCalendars(d.items || []);
           } catch (e) {
-            if (!cancelled) { setCalendars([]); setLoadErr('No se pudieron cargar los calendarios de GHL.'); }
+            if (!cancelled) {
+              setCalendars([]);
+              const code = e?.detail?.error || e?.detail?.code;
+              if (code === 'scope_missing') {
+                setLoadErr('El app instalado no tiene permiso para leer calendarios. Contacta al admin de la agencia para actualizar los scopes (calendars.readonly) en el listing del Marketplace y reinstalar.');
+              } else {
+                setLoadErr('No se pudieron cargar los calendarios de GHL.');
+              }
+            }
           } finally { if (!cancelled) setLoading(false); }
         }
       };
@@ -833,8 +850,8 @@
 
     return html`<div className="cta-asset-picker" data-testid="cta-asset-picker">
       <div className="cta-mode-tabs" style=${{ display: 'flex', gap: '4px', marginBottom: '10px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
-        ${tabBtn('form', 'Formulario GHL')}
-        ${tabBtn('calendar', 'Calendario GHL')}
+        ${tabBtn('form', 'Formulario')}
+        ${tabBtn('calendar', 'Calendario')}
         ${tabBtn('embed', 'Pegar embed')}
       </div>
 
@@ -2400,6 +2417,7 @@
             <thead><tr>
               <th></th>
               <th>Título</th>
+              <th>Referencia</th>
               <th>Precio</th>
               <th>Estado</th>
               <th>Vistas</th>
@@ -2432,6 +2450,7 @@
                     <div className="listing-title">${p.titulo || 'Sin título'}</div>
                     <div className="listing-loc">${[p.colonia, p.ciudad].filter(Boolean).join(', ')}</div>
                   </td>
+                  <td className="listing-ref" data-testid=${'listing-ref-' + rec.id}>${p.referencia_interna || '—'}</td>
                   <td className="listing-price">${priceDisplay}</td>
                   <td><span className=${'estado-badge estado-' + estado.toLowerCase()}>${estado}</span></td>
                   <td className="listing-views">${viewCounts[rec.id] || 0}</td>

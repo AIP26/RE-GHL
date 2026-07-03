@@ -133,8 +133,9 @@ def test_panel_html_has_new_fields():
     # CTA picker tabs (data-testid dinámico: 'cta-mode-' + m, m in ['form','calendar','embed'])
     assert "'cta-mode-' + m" in js
     assert "'cta-mode-tab'" in js
-    assert 'Formulario GHL' in js
-    assert 'Calendario GHL' in js
+    # BLOQUE P2 FIX 4 — labels renombrados sin sufijo "GHL"
+    assert '>Formulario<' in js or "'Formulario'" in js.replace('\n', ' ') or "'Formulario'" in js
+    assert '>Calendario<' in js or "'Calendario'" in js.replace('\n', ' ') or "'Calendario'" in js
     assert 'Pegar embed' in js
     # Row menu actions
     assert 'listing-duplicate-' in js

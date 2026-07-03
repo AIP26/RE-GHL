@@ -417,11 +417,37 @@ img { max-width: 100%; height: auto; display: block; }
 .mobile-cta .btn { flex: 1; padding: 14px 18px; font-size: 15px; }
 @media (min-width: 900px) { .mobile-cta { display: none; } }
 
-/* GHL Form embed */
-.ghl-form-embed { margin-top: 4px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid var(--color-border); }
-.ghl-form-embed iframe { display: block; width: 100%; }
+/* GHL Form / Calendar embed (BLOQUE P2 FIX 5).
+ *   - Altura máx 600px desktop, 500px mobile
+ *   - overflow-y:auto para contener scroll DENTRO del bloque
+ *   - heading opcional encima del iframe (cta_texto) */
+.ghl-form-embed { margin-top: 4px; border-radius: 8px; background: #fff; border: 1px solid var(--color-border); }
+.ghl-form-heading {
+  margin: 0; padding: 12px 14px 4px;
+  font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+  color: var(--color-text);
+}
+.ghl-form-embed-inner {
+  max-height: 600px;
+  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.ghl-form-embed-inner iframe { display: block; width: 100%; height: 600px; border: 0; }
 @media (max-width: 640px) {
-  .ghl-form-embed iframe { height: 720px; }
+  .ghl-form-embed-inner { max-height: 500px; }
+  .ghl-form-embed-inner iframe { height: 500px; }
+}
+
+/* PDF button placement (BLOQUE P2 FIX 5).
+ *   - Desktop: se muestra al final del sidebar (después del CTA)
+ *   - Mobile: se muestra ANTES del iframe del CTA, para que sea visible
+ *     sin hacer scroll excesivo */
+.pdf-desktop-only { display: block; }
+.pdf-mobile-only { display: none; }
+@media (max-width: 899px) {
+  .pdf-desktop-only { display: none; }
+  .pdf-mobile-only { display: block; margin-top: 4px; }
 }
 
 /* Widget WhatsApp flotante */
