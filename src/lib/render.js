@@ -122,6 +122,7 @@ export function cld(url, transform) {
 /** Genera el bloque <head> con CSS vars, SEO y meta tags. */
 export function head({
   title,
+  ogTitle,       // BLOQUE P5 FEATURE 2 — permite tener title != og:title
   description = '',
   brand,
   ogImage,
@@ -133,6 +134,7 @@ export function head({
   const secondary = safeColor(brand?.color_secundario, '#1e293b');
   const accent = safeColor(brand?.color_acento, '#f59e0b');
   const ga4 = brand?.ga4_tag;
+  const _ogTitle = ogTitle || title;
 
   return `
 <!doctype html>
@@ -145,7 +147,7 @@ ${description ? `<meta name="description" content="${esc(description)}" />` : ''
 ${noindex ? '<meta name="robots" content="noindex, nofollow" />' : ''}
 ${canonical ? `<link rel="canonical" href="${esc(canonical)}" />` : ''}
 <meta property="og:type" content="website" />
-<meta property="og:title" content="${esc(title)}" />
+<meta property="og:title" content="${esc(_ogTitle)}" />
 ${description ? `<meta property="og:description" content="${esc(description)}" />` : ''}
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
 ${ogUrl ? `<meta property="og:url" content="${esc(ogUrl)}" />` : ''}

@@ -223,6 +223,12 @@ r.get('/p/:slug', async (req, res, next) => {
     const agent = agents[p.agente_responsable];
 
     const title = `${p.titulo || 'Propiedad'} | ${brand?.nombre_agencia || ''}`.trim().replace(/\|\s*$/, '');
+    // BLOQUE P5 FEATURE 2 — Cuando la propiedad tiene referencia_publica,
+    // la incluimos en el og:title (visible en previews de WhatsApp, Meta,
+    // etc.). El <title> del navegador queda igual para no saturarlo.
+    const ogTitle = p.referencia_publica
+      ? `${p.titulo || 'Propiedad'} | REF: ${p.referencia_publica}`
+      : title;
     const description = (p.descripcion || '').slice(0, 160);
 
     // Amenidades vienen como texto separado por comas
@@ -234,6 +240,7 @@ r.get('/p/:slug', async (req, res, next) => {
     const html =
       head({
         title,
+        ogTitle,
         description,
         brand,
         ogImage: photoUrls[0] || brand?.hero_foto_url,
@@ -468,9 +475,15 @@ async function handleFichaOrganica(req, res, next) {
     const amenidades = (p.amenidades || '').split(',').map((s) => s.trim()).filter(Boolean);
 
     // SEO orgánica: noindex (no queremos competir con el portal del agente)
+    const orgTitle = p.titulo || 'Propiedad';
+    // BLOQUE P5 FEATURE 2 — REF también en og:title de la ficha orgánica.
+    const orgOgTitle = p.referencia_publica
+      ? `${orgTitle} | REF: ${p.referencia_publica}`
+      : orgTitle;
     const html =
       head({
-        title: p.titulo || 'Propiedad',
+        title: orgTitle,
+        ogTitle: orgOgTitle,
         description: (p.descripcion || '').slice(0, 160),
         brand: null,
         ogImage: photoUrls[0],

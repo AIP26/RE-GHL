@@ -102,6 +102,31 @@
   }
 
   // -------------------------------------------------------------------
+  // BLOQUE P5 FEATURE 1 — Web Share API con fallback a clipboard.
+  // Si `navigator.share()` está disponible (mobile / algunos desktop Chromium),
+  // abre el sheet nativo del OS. Si no, copia al portapapeles + toast.
+  // Silencia AbortError (usuario canceló el share sheet).
+  // -------------------------------------------------------------------
+  async function webShareOrCopy({ url, title, text }) {
+    if (!url) { toast('URL no disponible', 'error'); return; }
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError') return;   // usuario cerró el sheet
+        // Fallthrough a clipboard si share falla por otra razón
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('URL copiada ✓', 'success');
+    } catch {
+      toast('No pude copiar — selecciona y copia manualmente', 'error');
+    }
+  }
+
+  // -------------------------------------------------------------------
   // Form schema — replica el Master Context v2.6 y matchea ghl-field-ids.json
   // -------------------------------------------------------------------
   const AMENIDADES = ['Aire acondicionado','Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción','Cuarto de servicio'];
@@ -2500,6 +2525,17 @@
           portalBase,
           onClose: () => setOpenMenu(null),
           onEdit: () => { setOpenMenu(null); goEdit(openMenu.rec.id); },
+          onShareProperty: () => {
+            const rec = openMenu.rec;
+            setOpenMenu(null);
+            const p = rec.properties || {};
+            const slug = p.slug_url || rec.id;
+            webShareOrCopy({
+              url: portalBase + '/p/' + slug,
+              title: p.titulo || 'Propiedad',
+              text: `Mira esta propiedad en ${ctx.brand?.nombre_agencia || 'nuestra agencia'}`,
+            });
+          },
           onShare: () => { setOpenMenu(null); setShareTarget(openMenu.rec); },
           onChangeAgent: () => { setOpenMenu(null); setAgentTarget(openMenu.rec); },
           onChangeEstado: (nuevo) => { setOpenMenu(null); changeEstado(openMenu.rec, nuevo); },
@@ -2539,7 +2575,7 @@
   }
 
   // Floating dropdown menu rendered via portal — flips up when near bottom.
-  function RowMenuPortal({ anchor, rec, ctx, portalBase, onClose, onEdit, onShare, onChangeAgent, onChangeEstado, onDelete, onDuplicate, onResetViews }) {
+  function RowMenuPortal({ anchor, rec, ctx, portalBase, onClose, onEdit, onShare, onShareProperty, onChangeAgent, onChangeEstado, onDelete, onDuplicate, onResetViews }) {
     const ref = useRef(null);
     const [pos, setPos] = useState(null);
     const p = rec.properties || {};
@@ -2586,6 +2622,7 @@
       onClick=${(e) => e.stopPropagation()}
     >
       <a href=${portalBase + '/p/' + slug} target="_blank" rel="noopener" data-testid=${'listing-view-' + rec.id}>Ver propiedad</a>
+      <button onClick=${onShareProperty} data-testid=${'listing-share-property-' + rec.id}>Compartir</button>
       <button onClick=${onEdit} data-testid=${'listing-edit-' + rec.id}>Editar</button>
       <button onClick=${onDuplicate} data-testid=${'listing-duplicate-' + rec.id}>Duplicar propiedad</button>
       <button onClick=${onChangeAgent} data-testid=${'listing-change-agent-' + rec.id}>Cambiar agente</button>
@@ -2696,6 +2733,16 @@
       catch { toast('No pude copiar', 'error'); }
     };
 
+    // BLOQUE P5 FEATURE 1 — Compartir la URL orgánica via Web Share API.
+    const shareOrganic = () => {
+      if (!ficha?.url) return;
+      webShareOrCopy({
+        url: ficha.url,
+        title: property?.properties?.titulo || 'Propiedad',
+        text: 'Te comparto esta propiedad',
+      });
+    };
+
     return html`<div className="modal-backdrop" onClick=${onClose}>
       <div className="modal" onClick=${(e) => e.stopPropagation()} data-testid="share-modal" style=${{ maxWidth: '560px' }}>
         <div className="modal-header">
@@ -2721,7 +2768,8 @@
               <div className="share-url-label">Tu URL orgánica</div>
               <div className="share-url-row">
                 <code data-testid="share-url">${ficha.url}</code>
-                <button className="btn btn-ghost" onClick=${copyUrl}>Copiar</button>
+                <button className="btn btn-ghost" onClick=${copyUrl} data-testid="share-copy-btn">Copiar</button>
+                <button className="btn btn-primary" onClick=${shareOrganic} data-testid="share-native-btn">Compartir</button>
               </div>
               <div className="share-stats">
                 <span><strong>${ficha.vistas}</strong> vista${ficha.vistas === 1 ? '' : 's'}</span>
