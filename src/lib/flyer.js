@@ -170,8 +170,9 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
   // Textos
   const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
   const tipoInmuebleRaw = (p.tipo_inmueble || '').toUpperCase();
-const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleRaw;
-  const tipoOperacion = p.tipo_operacion || '';
+  const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleRaw;
+  const tipoOperacionRaw = (p.tipo_operacion || '').toUpperCase();
+  const tipoOperacion = tipoOperacionRaw === 'VENTA' || tipoOperacionRaw === 'RENTA' ? 'EN ' + tipoOperacionRaw : tipoOperacionRaw;
   const colonia = p.colonia || '';
   const direccionFooter = footerAddress(p);
   const precioStr = formatPrice(p);
@@ -185,7 +186,7 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 <text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
 <!-- EN VENTA: más cerca de DEPA -->
-<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
+<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion)}</text>
 
    <!-- MALLORCA/BALAY: subido para alinear con DEPA -->
 <text x="620" y="120" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
