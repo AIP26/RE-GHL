@@ -137,12 +137,11 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
     create: { width: W, height: H, channels: 4, background: CREAM },
   });
 
-  // ---- Capa 2: foto principal 1087×632, top=226, left=-6, opacity=80%
-  // Sharp no soporta opacity directo, usamos overlay con alpha
-  const photoResized = await sharp(photoBuf)
-    .resize(1087, 632, { fit: 'cover', position: 'center' })
-    .removeAlpha()
-    .toBuffer();
+ // ---- Capa 2: foto principal 1080×632, top=226, left=0, opacity=80%
+const photoResized = await sharp(photoBuf)
+  .resize(1080, 632, { fit: 'cover', position: 'center' })
+  .removeAlpha()
+  .toBuffer();
   
   // Overlay con opacidad 80% (alpha=0.8)
   const photoWithOpacity = await sharp({
