@@ -1,8 +1,8 @@
-// Generador de flyers 1000×1000 JPEG para redes sociales / WhatsApp.
-// Layout diseñado @1080; escalado con factor k = 1000/1080 ≈ 0.9259.
-// Pipeline: Sharp composite (base crema → foto → gradiente → rect precio →
+// Generador de flyers 1080×1080 JPEG para redes sociales / WhatsApp.
+// Layout basado en diseño de Canva @1080×1080.
+// Pipeline: Sharp composite (base crema → foto → gradiente blur → rect precio →
 // barra inferior → línea vertical → logo (client only) → SVG con todos
-// los textos).  Fuente Montserrat embebida vía @font-face (base64 en SVG)
+// los textos). Fuente Montserrat embebida vía @font-face (base64 en SVG)
 // para que librsvg no dependa del sistema.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,11 +15,11 @@ const __dirname = path.dirname(__filename);
 const FONT_DIR = path.resolve(__dirname, '../../assets/fonts');
 
 // Canvas
-const W = 1000;
-const H = 1000;
+const W = 1080;
+const H = 1080;
 const CREAM = '#f5f0ea';
 const DEFAULT_ACCENT = '#75634d';
-const TITLE_MAX_CHARS = 30;  // Máximo 30 caracteres para nombre de condominio
+const TITLE_MAX_CHARS = 30;
 
 // ---------------------------------------------------------------------
 // Fuente Montserrat cargada 1 sola vez y cacheada en base64.
@@ -38,8 +38,7 @@ async function loadFonts() {
   return _fontCache;
 }
 
-/** Bloque @font-face para embeber en el `<defs>` del SVG.  Sin esto,
- *  librsvg (backend de Sharp) no encuentra la fuente en el container. */
+/** Bloque @font-face para embeber en el `<defs>` del SVG. */
 function fontFaceDefs({ regularB64, boldB64 }) {
   return `<defs>
     <style>
@@ -59,8 +58,7 @@ function fontFaceDefs({ regularB64, boldB64 }) {
 }
 
 // ---------------------------------------------------------------------
-// Cloudinary → JPEG (mismo patrón que /lib/pdf.js).  Sharp puede leer WebP
-// pero forzar JPEG desde Cloudinary evita descargas más pesadas.
+// Cloudinary → JPEG
 // ---------------------------------------------------------------------
 function asJpg(url, width = 1400) {
   if (!url || typeof url !== 'string' || !url.includes('/upload/')) return url;
@@ -88,7 +86,7 @@ async function fetchBuffer(url, { timeout = 12_000 } = {}) {
 }
 
 // ---------------------------------------------------------------------
-// Utilidad para escapar texto dentro de SVG (< > & " ').
+// Utilidades
 // ---------------------------------------------------------------------
 function esc(s) {
   return String(s ?? '')
@@ -105,8 +103,6 @@ function truncate(s, max) {
   return str.slice(0, max - 1).trim() + '…';
 }
 
-/** Auto-shrink de una línea:  proyecta ancho aprox (chars × fontSize × 0.55)
- *  y reduce el tamaño hasta caber en `maxWidth`.  No trunca. */
 function fitFontSize(text, initialPt, maxWidth) {
   const str = String(text || '');
   if (!str) return initialPt;
@@ -119,18 +115,6 @@ function fitFontSize(text, initialPt, maxWidth) {
 // ---------------------------------------------------------------------
 // PIPELINE PRINCIPAL
 // ---------------------------------------------------------------------
-
-/**
- * Genera el flyer JPEG 1000×1000.
- *
- * @param {object} args
- * @param {object} args.property   Propiedades planas (titulo, precio_principal, ...)
- * @param {object} [args.brand]    configuracion_marca del tenant
- * @param {object} [args.agent]    Agente creador (whatsapp)
- * @param {'client'|'organic'} args.version
- * @param {string} args.photoUrl   URL de fotos[0]. Obligatoria.
- * @returns {Promise<Buffer>} JPEG buffer
- */
 export async function generateFlyer({ property, brand, agent, version, photoUrl }) {
   if (!photoUrl) throw new Error('missing_main_photo');
   const p = property;
@@ -153,130 +137,138 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
     create: { width: W, height: H, channels: 4, background: CREAM },
   });
 
-  // ---- Capa 2: foto principal cover a 1000×585 en (0, 209), opacidad 80%
-  //     Sharp no acepta offsets negativos ni imágenes que excedan el canvas
-  //     al hacer composite. Se ajusta a 1000×585 pegado al borde izq.
+  // ---- Capa 2: foto principal 1087×632, top=226, left=-6, opacity=80%
+  // Sharp no soporta opacity directo, usamos overlay con alpha
   const photoResized = await sharp(photoBuf)
-    .resize(1000, 585, { fit: 'cover', position: 'center' })
+    .resize(1087, 632, { fit: 'cover', position: 'center' })
     .removeAlpha()
     .toBuffer();
-  const photoOpacityOverlay = await sharp({
-    create: { width: 1000, height: 585, channels: 4,
-      background: { r: 245, g: 240, b: 234, alpha: 0.20 } },
-  }).png().toBuffer();
-
-  // ---- Capa 3: gradiente crema fade en esquina inf-der de la foto -------
-  //     De 200 px de ancho × 105 px alto, fade crema→transparente,
-  //     ubicado justo antes del rect precio (top 693..798, left 606..806).
-  const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="105" viewBox="0 0 200 105">
-  <defs>
-    <linearGradient id="fade" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${CREAM}" stop-opacity="0"/>
-      <stop offset="100%" stop-color="${CREAM}" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-  <rect width="200" height="105" fill="url(#fade)"/>
-</svg>`;
-
-  // ---- Capas 4-6: shapes (rect precio + barra inferior + línea vertical)
-  //     Todos en un solo SVG-shapes para 1 composite call.
-  const shapesSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
-  <!-- Rectángulo crema detrás del precio -->
-  <rect x="606" y="758" width="250" height="105" fill="${CREAM}" rx="4"/>
   
-  <!-- Barra inferior de stats -->
-  <rect x="0" y="879" width="1000" height="121" fill="${accent}"/>
-  
-  <!-- Línea vertical divisoria header -->
-  <line x1="500" y1="40" x2="500" y2="180" stroke="#000000" stroke-width="2"/>
-  
-  <!-- Líneas separadoras stats -->
-  <line x1="250" y1="879" x2="250" y2="1000" stroke="${CREAM}" stroke-width="3"/>
-  <line x1="500" y1="879" x2="500" y2="1000" stroke="${CREAM}" stroke-width="3"/>
-  <line x1="750" y1="879" x2="750" y2="1000" stroke="${CREAM}" stroke-width="3"/>
-</svg>`;
+  // Overlay con opacidad 80% (alpha=0.8)
+  const photoWithOpacity = await sharp({
+    create: { width: 1087, height: 632, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0.8 } },
+  })
+    .composite([{ input: photoResized, blend: 'over' }])
+    .png()
+    .toBuffer();
 
-  // ---- Capa 8: SVG con TODOS los textos ---------------------------------
+  // ---- Capa 3: gradiente blur crema (simulado con SVG)
+  // En Canva es una imagen blur rotada. Lo simulamos con SVG gradient.
+  const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="270" height="150" viewBox="0 0 270 150">
+    <defs>
+      <linearGradient id="blurFade" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${CREAM}" stop-opacity="0"/>
+        <stop offset="50%" stop-color="${CREAM}" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="${CREAM}" stop-opacity="1"/>
+      </linearGradient>
+      <filter id="blur">
+        <feGaussianBlur stdDeviation="8"/>
+      </filter>
+    </defs>
+    <rect width="270" height="150" fill="url(#blurFade)" filter="url(#blur)"/>
+  </svg>`;
+
+  // ---- Capa 4: rectángulo crema precio 270×113, top=818, left=654
+  const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="270" height="113" viewBox="0 0 270 113">
+    <rect width="270" height="113" fill="${CREAM}" rx="4"/>
+  </svg>`;
+
+  // ---- Capa 5: barra inferior dorada 1080×72, top=852
+  const barraSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="72" viewBox="0 0 1080 72">
+    <rect width="1080" height="72" fill="${accent}"/>
+  </svg>`;
+
+  // ---- Capa 6: líneas divisoras
+  const lineasSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+    <!-- Línea vertical negra header x=648, y=209→80 -->
+    <line x1="648" y1="209" x2="648" y2="80" stroke="#000000" stroke-width="3"/>
+    <!-- Línea crema vertical 1 x=210, y=930→861 -->
+    <line x1="210" y1="930" x2="210" y2="861" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema vertical 2 x=434, y=927→858 -->
+    <line x1="434" y1="927" x2="434" y2="858" stroke="${CREAM}" stroke-width="3"/>
+  </svg>`;
+
+  // ---- Capa 7: SVG con TODOS los textos ---------------------------------
   const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
   const tipoInmueble = (p.tipo_inmueble || '').toUpperCase();
   const tipoOperacion = p.tipo_operacion || '';
-  const colonia = fitAddress(p);   // dirección_colonia scaled
+  const colonia = p.colonia || '';
   const direccionFooter = footerAddress(p);
   const precioStr = formatPrice(p);
   const notaPrecio = (p.nota_precio || '').trim();
 
-  // Autoshrink dirección_colonia si excede ~381px (right edge del canvas
-  // menos el margen: 1000 - 619 = 381). Base 25.6pt.
-  const coloniaSize = fitFontSize(colonia, 25.6, 381);
-  // Auto-shrink del título para que quepa entre x=619 y el borde derecho
-  // (margen visual ~20px → maxWidth = 1000 - 619 - 20 = 361).
- const tituloSize = fitFontSize(nombreCondominio, 36.8, 361);
-  // Stats
-  const banos = safeNum(p.banos_completos);
-  const recamaras = safeNum(p.recamaras);
-  const niveles = safeNum(p.niveles);
-  const m2c = safeNum(p.m2_construccion);
-
   const wa = (version === 'client' && agent?.whatsapp) ? String(agent.whatsapp) : '';
 
-  const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
-  ${fontFaceDefs(fonts)}
-  
-  <!-- Header izquierdo: tipo_inmueble -->
-  <text x="40" y="80" font-family="Montserrat" font-weight="700" font-size="28" fill="${accent}">${esc(tipoInmueble)}</text>
-  
-  <!-- Header izquierdo: tipo_operacion -->
-  <text x="40" y="115" font-family="Montserrat" font-weight="400" font-size="20" fill="#000000">${esc(tipoOperacion)}</text>
-  
-  <!-- Header derecho: nombre del condominio -->
-<text x="519" y="80" font-family="Montserrat" font-weight="700" font-size="${tituloSize}" fill="${accent}">${esc(nombreCondominio)}</text>
-
-<!-- Header derecho: colonia/zona -->
-<text x="519" y="115" font-family="Montserrat" font-weight="400" font-size="${coloniaSize}" fill="#000000">${esc(colonia)}</text>
-  <!-- Precio -->
-  <text x="626" y="805" font-family="Montserrat" font-weight="700" font-size="28" fill="#000000">${esc(precioStr)}</text>
-  
-  <!-- Nota de precio -->
-  ${notaPrecio ? `<text x="626" y="835" font-family="Montserrat" font-weight="400" font-size="16" fill="${accent}">${esc(notaPrecio)}</text>` : ''}
-  
-  <!-- Stats -->
-  <text x="125" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${banos} BAÑOS</text>
-  <text x="375" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${recamaras} RECÁMARAS</text>
-  <text x="625" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${niveles} NIVELES</text>
-  <text x="875" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${m2c} M² CONST.</text>
-  
-  <!-- Dirección footer -->
-  <text x="60" y="970" font-family="Montserrat" font-weight="400" font-size="14" fill="#000000">${esc(direccionFooter)}</text>
-  
-  <!-- WhatsApp (solo version=client) -->
-  ${wa ? `<text x="60" y="990" font-family="Montserrat" font-weight="400" font-size="12" fill="#666666">${esc('WhatsApp: ' + wa)}</text>` : ''}
-  
-  <!-- Pin de ubicación -->
-  <path d="M40 955 C40 950, 44 946, 48 946 C52 946, 56 950, 56 955 C56 962, 48 970, 48 970 C48 970, 40 962, 40 955 Z" fill="${accent}"/>
-  <circle cx="48" cy="955" r="3" fill="#ffffff"/>
-</svg>`;
+  const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+    ${fontFaceDefs(fonts)}
+    
+    <!-- Header izquierdo: "CASA" x=323, y=39, font=57.7pt -->
+    <text x="323" y="96" font-family="Montserrat" font-weight="700" font-size="57.7" fill="${accent}">${esc(tipoInmueble)}</text>
+    
+    <!-- Header izquierdo: "EN VENTA" x=223, y=121, font=49.2pt -->
+    <text x="223" y="170" font-family="Montserrat" font-weight="400" font-size="49.2" fill="#000000">${esc(tipoOperacion)}</text>
+    
+    <!-- Header derecho: "MALLORCA" x=669, y=76, font=39.7pt -->
+    <text x="669" y="116" font-family="Montserrat" font-weight="700" font-size="39.7" fill="${accent}">${esc(nombreCondominio)}</text>
+    
+    <!-- Header derecho: "POLÍGONO SUR" x=669, y=156, font=27.7pt -->
+    <text x="669" y="184" font-family="Montserrat" font-weight="400" font-size="27.7" fill="#000000">${esc(colonia)}</text>
+    
+    <!-- Precio: x=663, y=806, centrado, font=28.4pt -->
+    <text x="789" y="834" font-family="Montserrat" font-weight="700" font-size="28.4" fill="#000000" text-anchor="middle">${esc(precioStr)}</text>
+    
+    <!-- Nota precio: x=681, y=859, centrado, font=18.4pt -->
+    ${notaPrecio ? `<text x="789" y="877" font-family="Montserrat" font-weight="400" font-size="18.4" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
+    
+    <!-- Stats: "2.5 BAÑOS" x=-13, y=876, centrado, font=16.8pt -->
+    <text x="105" y="893" font-family="Montserrat" font-weight="400" font-size="16.8" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+    
+    <!-- Stats: "3 RECAMARAS" x=209, y=876, centrado, font=16.8pt -->
+    <text x="322" y="893" font-family="Montserrat" font-weight="400" font-size="16.8" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+    
+    <!-- Stats: "2 NIVELES" x=439, y=876, centrado, font=14.8pt -->
+    <text x="536" y="893" font-family="Montserrat" font-weight="400" font-size="14.8" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+    
+    <!-- Stats: m² (cuarta columna, si aplica) -->
+    <text x="750" y="893" font-family="Montserrat" font-weight="400" font-size="14.8" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+    
+    <!-- Footer: 📍 + dirección x=122, y=970, font=19.7pt -->
+    <text x="122" y="990" font-family="Montserrat" font-weight="400" font-size="19.7" fill="#000000">📍 ${esc(direccionFooter)}</text>
+    
+    <!-- WhatsApp (solo version=client) -->
+    ${wa ? `<text x="122" y="1020" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666">WhatsApp: ${esc(wa)}</text>` : ''}
+  </svg>`;
 
   // ---- Ensamblado -----------------------------------------------------
   const composites = [
-    // 2. Foto
-    { input: photoResized, top: 209, left: 0 },
-    // 2b. Overlay crema translúcido (simula opacidad 80% de la foto)
-    { input: photoOpacityOverlay, top: 209, left: 0 },
-    // 3. Gradiente fade en esquina inf-der de la foto
-    { input: Buffer.from(gradientSvg), top: 693, left: 606 },
-    // 4-6. Rect precio + barra inferior + separadores + línea vertical
-    { input: Buffer.from(shapesSvg), top: 0, left: 0 },
+    // 2. Foto con opacidad 80%
+    { input: photoWithOpacity, top: 226, left: -6 },
+    // 3. Gradiente blur
+    { input: Buffer.from(gradientSvg), top: 612, left: 714 },
+    // 4. Rectángulo crema precio
+    { input: Buffer.from(rectPrecioSvg), top: 818, left: 654 },
+    // 5. Barra inferior dorada
+    { input: Buffer.from(barraSvg), top: 852, left: 0 },
+    // 6. Líneas divisoras
+    { input: Buffer.from(lineasSvg), top: 0, left: 0 },
   ];
 
-  // 7. Logo (SOLO version=client). En el spec original quedaba
-  //    bleeding a (-14,-55); sharp no permite offsets negativos.
-  //    Se posiciona pegado a la esquina sup-izq del canvas.
+  // 7. Logo (SOLO version=client). 
+  // En Canva: 299×269, top=-59, left=-15 (recortado)
+  // Sharp no permite offsets negativos, simulamos con recorte
   if (logoBuf) {
-    const logoResized = await sharp(logoBuf)
-      .resize(263, 194, { fit: 'inside', withoutEnlargement: false })
+    const logoProcessed = await sharp(logoBuf)
+      .resize(299, 269, { fit: 'inside', withoutEnlargement: false })
+      .extend({
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
+      })
       .png()
       .toBuffer();
-    composites.push({ input: logoResized, top: 10, left: 10 });
+    composites.push({ input: logoProcessed, top: 0, left: 0 });
   }
 
   // 8. SVG con todos los textos (encima de todo)
@@ -298,18 +290,11 @@ function safeNum(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** dirección_colonia: colonia · ciudad (formato compacto para header). */
-function fitAddress(p) {
-  return p.colonia || p.estado_municipio || '';
-}
-
-/** Dirección completa para el footer (más detallada). */
 function footerAddress(p) {
   const parts = [p.direccion, p.colonia, p.ciudad, p.estado_municipio].filter(Boolean);
   return parts.join(', ') || 'Ubicación disponible bajo consulta';
 }
 
-/** "$X,XXX,XXX MXN" con separador de miles y moneda al final. */
 function formatPrice(p) {
   const precio = Number(p.precio_principal || 0);
   const moneda = String(p.moneda_principal || '').toUpperCase() || 'MXN';
