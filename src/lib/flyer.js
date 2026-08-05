@@ -160,13 +160,13 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     <!-- Línea negra header: (600,74) → (600,194) -->
     <line x1="600" y1="74" x2="600" y2="194" stroke="#000000" stroke-width="3"/>
     <!-- Línea crema barra 1: BAÑOS | RECÁMARAS -->
-    <line x1="195" y1="789" x2="195" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <line x1="200" y1="789" x2="200" y2="856" stroke="${CREAM}" stroke-width="3"/>
     <!-- Línea crema barra 2: RECÁMARAS | NIVELES -->
-    <line x1="402" y1="789" x2="402" y2="856" stroke="${CREAM}" stroke-width="3"/>
-         <!-- Línea crema barra 3: NIVELES | M² -->
-    <line x1="609" y1="789" x2="609" y2="856" stroke="${CREAM}" stroke-width="3"/>
-    <!-- Línea crema barra 4: M² construcción | M² terreno -->
-    <line x1="750" y1="789" x2="750" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <line x1="400" y1="789" x2="400" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 3: NIVELES | M² CONST -->
+    <line x1="600" y1="789" x2="600" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 4: M² CONST | M² TERRENO -->
+    <line x1="800" y1="789" x2="800" y2="856" stroke="${CREAM}" stroke-width="3"/>
   </svg>`;
 
   // Textos
@@ -203,22 +203,20 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     <!-- Nota precio: x=631, y=795, font=17pt, centrado -->
     ${notaPrecio ? `<text x="731" y="812" font-family="Montserrat" font-weight="400" font-size="17" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
     
-  <!-- 2.5 BAÑOS -->
-<text x="80" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+    <!-- 2.5 BAÑOS -->
+<text x="100" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
 
 <!-- 3 RECÁMARAS -->
-<text x="240" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+<text x="300" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
 
 <!-- 2 NIVELES -->
-<text x="400" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+<text x="500" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
 
 <!-- M² construcción -->
-<text x="600" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+<text x="700" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
 <!-- M² terreno (solo si existe) -->
-${m2t > 0 ? `<text x="875" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M²</text>` : ''}
-<!-- M² TERRENO (solo si existe) -->
-${m2t > 0 ? `<text x="875" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M² TERRENO</text>` : ''}
+${m2t > 0 ? `<text x="900" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M²</text>` : ''}
 
   <!-- Dirección centrada en negritas -->
 <text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
