@@ -197,7 +197,7 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
 </svg>`;
 
   // ---- Capa 8: SVG con TODOS los textos ---------------------------------
-  const titulo = truncate(p.titulo || 'Propiedad', TITLE_MAX_CHARS);
+  const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
   const tipoInmueble = (p.tipo_inmueble || '').toUpperCase();
   const tipoOperacion = p.tipo_operacion || '';
   const colonia = fitAddress(p);   // dirección_colonia scaled
@@ -229,12 +229,11 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   <!-- Header izquierdo: tipo_operacion -->
   <text x="40" y="115" font-family="Montserrat" font-weight="400" font-size="20" fill="#000000">${esc(tipoOperacion)}</text>
   
-  <!-- Header derecho: título -->
-  <text x="519" y="80" font-family="Montserrat" font-weight="700" font-size="${tituloSize}" fill="${accent}">${esc(titulo)}</text>
-  
-  <!-- Header derecho: colonia -->
-  <text x="519" y="115" font-family="Montserrat" font-weight="400" font-size="${coloniaSize}" fill="#000000">${esc(colonia)}</text>
-  
+  <!-- Header derecho: nombre del condominio -->
+<text x="519" y="80" font-family="Montserrat" font-weight="700" font-size="${tituloSize}" fill="${accent}">${esc(nombreCondominio)}</text>
+
+<!-- Header derecho: colonia/zona -->
+<text x="519" y="115" font-family="Montserrat" font-weight="400" font-size="${coloniaSize}" fill="#000000">${esc(colonia)}</text>
   <!-- Precio -->
   <text x="626" y="805" font-family="Montserrat" font-weight="700" font-size="28" fill="#000000">${esc(precioStr)}</text>
   
@@ -302,7 +301,7 @@ function safeNum(v) {
 
 /** dirección_colonia: colonia · ciudad (formato compacto para header). */
 function fitAddress(p) {
-  return [p.colonia, p.ciudad].filter(Boolean).join(', ') || (p.estado_municipio || '');
+  return p.colonia || p.estado_municipio || '';
 }
 
 /** Dirección completa para el footer (más detallada). */
