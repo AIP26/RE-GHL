@@ -133,16 +133,16 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   // Gradient blur simulado con SVG (139×250 rotado -90° = 250×139)
   // Posición Canva: top:566, left:661 → en 1000×1000: top:566, left:661
   // Pero 566+139=705, 661+250=911 ✅ dentro del canvas
-  const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="139" viewBox="0 0 250 139">
+ const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="200" viewBox="0 0 250 200">
     <defs>
-      <linearGradient id="blurFade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="blurFade" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="${CREAM}" stop-opacity="0"/>
-        <stop offset="50%" stop-color="${CREAM}" stop-opacity="0.6"/>
-        <stop offset="100%" stop-color="${CREAM}" stop-opacity="1"/>
+        <stop offset="40%" stop-color="${CREAM}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${CREAM}" stop-opacity="0.9"/>
       </linearGradient>
-      <filter id="blur"><feGaussianBlur stdDeviation="6"/></filter>
+      <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
     </defs>
-    <rect width="250" height="139" fill="url(#blurFade)" filter="url(#blur)"/>
+    <rect width="250" height="200" fill="url(#blurFade)" filter="url(#blur)"/>
   </svg>`;
 
   // Rectángulo precio: 250×140, top:722, left:606 (crece hacia arriba)
@@ -163,8 +163,10 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     <line x1="195" y1="789" x2="195" y2="856" stroke="${CREAM}" stroke-width="3"/>
     <!-- Línea crema barra 2: RECÁMARAS | NIVELES -->
     <line x1="402" y1="789" x2="402" y2="856" stroke="${CREAM}" stroke-width="3"/>
-    <!-- Línea crema barra 3: NIVELES | M² ← NUEVA -->
+        <!-- Línea crema barra 3: NIVELES | M² CONST -->
     <line x1="609" y1="789" x2="609" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 4: M² CONST | M² TERRENO -->
+    <line x1="750" y1="789" x2="750" y2="856" stroke="${CREAM}" stroke-width="3"/>
   </svg>`;
 
   // Textos
@@ -174,6 +176,7 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
   const tipoOperacionRaw = (p.tipo_operacion || '').toUpperCase();
   const tipoOperacion = tipoOperacionRaw === 'VENTA' || tipoOperacionRaw === 'RENTA' ? 'EN ' + tipoOperacionRaw : tipoOperacionRaw;
   const colonia = p.colonia || '';
+  const m2t = safeNum(p.m2_terreno);
   const direccionFooter = footerAddress(p);
   const precioStr = formatPrice(p);
   const notaPrecio = (p.nota_precio || '').trim();
@@ -209,8 +212,11 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
 <!-- 2 NIVELES -->
 <text x="505" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
 
-<!-- M² -->
-<text x="710" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+<!-- M² CONST. -->
+<text x="680" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M² CONST.</text>
+
+<!-- M² TERRENO (solo si existe) -->
+${m2t > 0 ? `<text x="875" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M² TERRENO</text>` : ''}
 
   <!-- Dirección centrada en negritas -->
 <text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
@@ -225,7 +231,7 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
     { input: photoResized, top: 210, left: 0 },
     { input: photoOverlay, top: 210, left: 0 },
     // Gradient blur
-    { input: Buffer.from(gradientSvg), top: 700, left: 606 },
+    { input: Buffer.from(gradientSvg), top: 522, left: 606 },
     // Rectángulo precio
     { input: Buffer.from(rectPrecioSvg), top: 722, left: 606 },
     // Barra inferior
