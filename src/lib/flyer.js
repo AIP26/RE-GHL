@@ -119,7 +119,6 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   });
 
   // Foto: 1000×585 (ajustada al canvas, no más ancha)
-  // Canva dice 1006×585 con left:-6, pero Sharp no permite > canvas ni negativos
   const photoResized = await sharp(photoBuf)
     .resize(1000, 585, { fit: 'cover', position: 'center' })
     .removeAlpha()
@@ -130,10 +129,8 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
     create: { width: 1000, height: 585, channels: 4, background: { r: 245, g: 240, b: 234, alpha: 0.2 } },
   }).png().toBuffer();
 
-  // Gradient blur simulado con SVG (139×250 rotado -90° = 250×139)
-  // Posición Canva: top:566, left:661 → en 1000×1000: top:566, left:661
-  // Pero 566+139=705, 661+250=911 ✅ dentro del canvas
- const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="200" viewBox="0 0 250 200">
+  // Gradient blur simulado con SVG
+  const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="200" viewBox="0 0 250 200">
     <defs>
       <linearGradient id="blurFade" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="${CREAM}" stop-opacity="0"/>
@@ -146,7 +143,7 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   </svg>`;
 
   // Rectángulo precio: 250×140, top:722, left:606 (crece hacia arriba)
-const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="140" viewBox="0 0 250 140">
+  const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="140" viewBox="0 0 250 140">
     <rect width="250" height="140" fill="${CREAM}" rx="4"/>
   </svg>`;
 
@@ -171,6 +168,13 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
 
   // Textos
   const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
+  
+  // ========== NUEVO: Dividir nombre del condominio en dos líneas ==========
+  const nombreParts = nombreCondominio.toUpperCase().split(' ');
+  const nombreLinea1 = nombreParts[0] || '';
+  const nombreLinea2 = nombreParts.slice(1).join(' ') || '';
+  // =====================================================================
+  
   const tipoInmuebleRaw = (p.tipo_inmueble || '').toUpperCase();
   const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPTO' : tipoInmuebleRaw;
   const tipoOperacionRaw = (p.tipo_operacion || '').toUpperCase();
@@ -185,64 +189,54 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
   const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     ${fontFaceDefs(fonts)}
     
-<!-- DEPA: bajado para alinear visualmente con BALAY -->
-<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="65" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+    <!-- DEPA: bajado para alinear visualmente con BALAY -->
+    <text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="65" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
-<!-- EN VENTA: más cerca de DEPA -->
-<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="45" fill="#000000">${esc(tipoOperacion)}</text>
+    <!-- EN VENTA: más cerca de DEPA -->
+    <text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="45" fill="#000000">${esc(tipoOperacion)}</text>
 
-   <!-- MALLORCA/BALAY: subido para alinear con DEPA -->
-<text x="620" y="120" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
+    <!-- ========== NUEVO: Nombre condominio en dos líneas ========== -->
+    <!-- Nombre condominio línea 1 -->
+    <text x="620" y="110" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreLinea1)}</text>
+    
+    <!-- Nombre condominio línea 2 (solo si existe segunda palabra) -->
+    ${nombreLinea2 ? `<text x="620" y="150" font-family="Montserrat" font-weight="700" font-size="28" fill="${accent}">${esc(nombreLinea2)}</text>` : ''}
+    <!-- ========================================================== -->
+    
+    <!-- Colonia/Zona -->
+    <text x="620" y="190" font-family="Montserrat" font-weight="400" font-size="25.7" fill="#000000">${esc(colonia.toUpperCase())}</text>
 
-<!-- POLÍGONO SUR: en mayúsculas -->
-<text x="620" y="171" font-family="Montserrat" font-weight="400" font-size="25.7" fill="#000000">${esc(colonia.toUpperCase())}</text>
-
-    <!-- Precio: x=614, y=746, font=26.3pt, centrado -->
+    <!-- Precio: centrado -->
     <text x="731" y="772" font-family="Montserrat" font-weight="700" font-size="26.3" fill="#000000" text-anchor="middle">${esc(precioStr)}</text>
     
-    <!-- Nota precio: x=631, y=795, font=17pt, centrado -->
+    <!-- Nota precio -->
     ${notaPrecio ? `<text x="731" y="812" font-family="Montserrat" font-weight="400" font-size="17" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
     
-    <!-- 2.5 BAÑOS -->
-<text x="100" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+    <!-- Stats -->
+    <text x="100" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+    <text x="300" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+    <text x="500" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+    <text x="700" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+    ${m2t > 0 ? `<text x="900" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M²</text>` : ''}
 
-<!-- 3 RECÁMARAS -->
-<text x="300" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
-
-<!-- 2 NIVELES -->
-<text x="500" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
-
-<!-- M² construcción -->
-<text x="700" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
-
-<!-- M² terreno (solo si existe) -->
-${m2t > 0 ? `<text x="900" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M²</text>` : ''}
-
-  <!-- Dirección centrada en negritas -->
-<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
-<!-- WhatsApp centrado -->
-${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
+    <!-- Dirección centrada en negritas -->
+    <text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
+    
+    <!-- WhatsApp centrado -->
+    ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
   </svg>`;
 
-  // Composites (todo debe caber en 1000×1000)
-  // Composites (todo debe caber en 1000×1000)
+  // Composites
   const composites = [
-    // Foto + overlay opacidad
     { input: photoResized, top: 210, left: 0 },
     { input: photoOverlay, top: 210, left: 0 },
-    // Gradient blur
     { input: Buffer.from(gradientSvg), top: 540, left: 606 },
-    // Rectángulo precio
     { input: Buffer.from(rectPrecioSvg), top: 722, left: 606 },
-    // Barra inferior
     { input: Buffer.from(barraSvg), top: 789, left: 0 },
-    // Líneas
     { input: Buffer.from(lineasSvg), top: 0, left: 0 },
   ];
 
-  // Logo: Canva lo pone en (-54, -14) pero Sharp no permite negativos
-  // Lo posicionamos en (0, 0) y recortamos visualmente si es necesario
- if (logoBuf) {
+  if (logoBuf) {
     const logoProcessed = await sharp(logoBuf)
       .resize(220, 200, { fit: 'inside', withoutEnlargement: false })
       .png()
@@ -250,7 +244,6 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
     composites.push({ input: logoProcessed, top: 40, left: 20 });
   }
 
-  // Textos (encima de todo)
   composites.push({ input: Buffer.from(textSvg), top: 0, left: 0 });
 
   const jpegBuf = await base
