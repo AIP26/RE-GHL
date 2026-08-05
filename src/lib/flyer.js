@@ -185,7 +185,7 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 <text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
 <!-- EN VENTA: más cerca de DEPA -->
-<text x="320" y="145" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
+<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
 
    <!-- MALLORCA/BALAY: subido para alinear con DEPA -->
 <text x="620" y="120" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
@@ -224,7 +224,7 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
     { input: photoResized, top: 210, left: 0 },
     { input: photoOverlay, top: 210, left: 0 },
     // Gradient blur
-    { input: Buffer.from(gradientSvg), top: 722, left: 661 },
+    { input: Buffer.from(gradientSvg), top: 700, left: 606 },
     // Rectángulo precio
     { input: Buffer.from(rectPrecioSvg), top: 722, left: 606 },
     // Barra inferior
