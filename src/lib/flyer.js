@@ -186,7 +186,7 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     ${fontFaceDefs(fonts)}
     
 <!-- DEPA: bajado para alinear visualmente con BALAY -->
-<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="75" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="65" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
 <!-- EN VENTA: más cerca de DEPA -->
 <text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="45" fill="#000000">${esc(tipoOperacion)}</text>
