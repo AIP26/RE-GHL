@@ -203,14 +203,14 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     <!-- Nota precio: x=631, y=795, font=17pt, centrado -->
     ${notaPrecio ? `<text x="731" y="812" font-family="Montserrat" font-weight="400" font-size="17" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
     
-   <!-- 2.5 BAÑOS -->
-<text x="97" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+  <!-- 2.5 BAÑOS -->
+<text x="80" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
 
 <!-- 3 RECÁMARAS -->
-<text x="298" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+<text x="240" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
 
 <!-- 2 NIVELES -->
-<text x="505" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+<text x="400" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
 
 <!-- M² CONST. -->
 <text x="680" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M² CONST.</text>
