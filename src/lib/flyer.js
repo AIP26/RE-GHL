@@ -163,9 +163,9 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     <line x1="195" y1="789" x2="195" y2="856" stroke="${CREAM}" stroke-width="3"/>
     <!-- Línea crema barra 2: RECÁMARAS | NIVELES -->
     <line x1="402" y1="789" x2="402" y2="856" stroke="${CREAM}" stroke-width="3"/>
-        <!-- Línea crema barra 3: NIVELES | M² CONST -->
+         <!-- Línea crema barra 3: NIVELES | M² -->
     <line x1="609" y1="789" x2="609" y2="856" stroke="${CREAM}" stroke-width="3"/>
-    <!-- Línea crema barra 4: M² CONST | M² TERRENO -->
+    <!-- Línea crema barra 4: M² construcción | M² terreno -->
     <line x1="750" y1="789" x2="750" y2="856" stroke="${CREAM}" stroke-width="3"/>
   </svg>`;
 
@@ -212,9 +212,11 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
 <!-- 2 NIVELES -->
 <text x="400" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
 
-<!-- M² CONST. -->
-<text x="680" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M² CONST.</text>
+<!-- M² construcción -->
+<text x="600" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
+<!-- M² terreno (solo si existe) -->
+${m2t > 0 ? `<text x="875" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M²</text>` : ''}
 <!-- M² TERRENO (solo si existe) -->
 ${m2t > 0 ? `<text x="875" y="835" font-family="Montserrat" font-weight="700" font-size="16" fill="${CREAM}" text-anchor="middle">${m2t} M² TERRENO</text>` : ''}
 
