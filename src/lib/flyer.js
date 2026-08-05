@@ -159,10 +159,12 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   const lineasSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     <!-- Línea negra header: (600,74) → (600,194) -->
     <line x1="600" y1="74" x2="600" y2="194" stroke="#000000" stroke-width="3"/>
-    <!-- Línea crema barra izq: (195,797) → (195,862) -->
-    <line x1="195" y1="797" x2="195" y2="862" stroke="${CREAM}" stroke-width="3"/>
-    <!-- Línea crema barra centro: (402,794) → (402,858) -->
-    <line x1="402" y1="794" x2="402" y2="858" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 1: BAÑOS | RECÁMARAS -->
+    <line x1="195" y1="789" x2="195" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 2: RECÁMARAS | NIVELES -->
+    <line x1="402" y1="789" x2="402" y2="856" stroke="${CREAM}" stroke-width="3"/>
+    <!-- Línea crema barra 3: NIVELES | M² ← NUEVA -->
+    <line x1="609" y1="789" x2="609" y2="856" stroke="${CREAM}" stroke-width="3"/>
   </svg>`;
 
   // Textos
@@ -179,12 +181,11 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
   const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     ${fontFaceDefs(fonts)}
     
- <!-- DEPA: a la misma altura que BALAY -->
-<text x="320" y="107" font-family="Montserrat" font-weight="700" font-size="60" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+<!-- DEPA: alineado con BALAY -->
+<text x="320" y="100" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
-<!-- EN VENTA: debajo de DEPA -->
-<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="35" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
-
+<!-- EN VENTA: más cerca de DEPA -->
+<text x="320" y="145" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
    <!-- MALLORCA: en mayúsculas -->
 <text x="620" y="107" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
 
@@ -197,20 +198,20 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
     <!-- Nota precio: x=631, y=795, font=17pt, centrado -->
     ${notaPrecio ? `<text x="731" y="812" font-family="Montserrat" font-weight="400" font-size="17" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
     
-    <!-- 2.5 BAÑOS -->
-<text x="88" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+   <!-- 2.5 BAÑOS -->
+<text x="97" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
 
-<!-- 3 RECAMARAS -->
-<text x="298" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+<!-- 3 RECÁMARAS -->
+<text x="298" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
 
 <!-- 2 NIVELES -->
-<text x="504" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+<text x="505" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
 
-<!-- m² -->
-<text x="710" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+<!-- M² -->
+<text x="710" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
   <!-- Dirección centrada en negritas -->
-<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
+<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
 <!-- WhatsApp centrado -->
 ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
   </svg>`;
