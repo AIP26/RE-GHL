@@ -214,8 +214,9 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 
 <!-- WhatsApp centrado -->
 ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
+  </svg>`;
 
-
+  // Composites (todo debe caber en 1000×1000)
   // Composites (todo debe caber en 1000×1000)
   const composites = [
     // Foto + overlay opacidad
