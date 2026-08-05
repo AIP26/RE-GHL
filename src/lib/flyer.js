@@ -179,11 +179,11 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
   const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     ${fontFaceDefs(fonts)}
     
-   <!-- DEPA: en mayúsculas -->
-<text x="320" y="95" font-family="Montserrat" font-weight="700" font-size="70" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+ <!-- DEPA: a la misma altura que BALAY -->
+<text x="320" y="107" font-family="Montserrat" font-weight="700" font-size="60" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
-<!-- EN VENTA: en mayúsculas -->
-<text x="320" y="160" font-family="Montserrat" font-weight="400" font-size="40" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
+<!-- EN VENTA: debajo de DEPA -->
+<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="35" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
 
    <!-- MALLORCA: en mayúsculas -->
 <text x="620" y="107" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
@@ -209,9 +209,8 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 <!-- m² -->
 <text x="710" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
-   <!-- Dirección centrada -->
-<text x="500" y="920" font-family="Montserrat" font-weight="400" font-size="20" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
-
+  <!-- Dirección centrada en negritas -->
+<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
 <!-- WhatsApp centrado -->
 ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
   </svg>`;
@@ -239,7 +238,7 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
       .resize(180, 160, { fit: 'inside', withoutEnlargement: false })
       .png()
       .toBuffer();
-    composites.push({ input: logoProcessed, top: 15, left: 15 });
+    composites.push({ input: logoProcessed, top: 25, left: 15 });
   }
 
   // Textos (encima de todo)
