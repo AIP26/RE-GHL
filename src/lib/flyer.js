@@ -19,7 +19,7 @@ const W = 1000;
 const H = 1000;
 const CREAM = '#f5f0ea';
 const DEFAULT_ACCENT = '#75634d';
-const TITLE_MAX_CHARS = 45;
+const TITLE_MAX_CHARS = 30;  // Máximo 30 caracteres para nombre de condominio
 
 // ---------------------------------------------------------------------
 // Fuente Montserrat cargada 1 sola vez y cacheada en base64.
