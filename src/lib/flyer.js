@@ -167,7 +167,8 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
 
   // Textos
   const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
-  const tipoInmueble = (p.tipo_inmueble || '').toUpperCase();
+  const tipoInmuebleRaw = (p.tipo_inmueble || '').toUpperCase();
+const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleRaw;
   const tipoOperacion = p.tipo_operacion || '';
   const colonia = p.colonia || '';
   const direccionFooter = footerAddress(p);
@@ -178,18 +179,18 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     ${fontFaceDefs(fonts)}
     
-    <!-- CASA: x=299, y=36, font=53.4pt -->
-    <text x="299" y="89" font-family="Montserrat" font-weight="700" font-size="53.4" fill="${accent}">${esc(tipoInmueble)}</text>
-    
-    <!-- EN VENTA: x=207, y=112, font=45.6pt -->
-    <text x="207" y="157" font-family="Montserrat" font-weight="400" font-size="45.6" fill="#000000">${esc(tipoOperacion)}</text>
-    
-    <!-- MALLORCA: x=620, y=70, font=36.7pt -->
-    <text x="620" y="107" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio)}</text>
-    
-    <!-- POLÍGONO SUR: x=620, y=145, font=25.7pt -->
-    <text x="620" y="171" font-family="Montserrat" font-weight="400" font-size="25.7" fill="#000000">${esc(colonia)}</text>
-    
+   <!-- DEPA: en mayúsculas -->
+<text x="320" y="95" font-family="Montserrat" font-weight="700" font-size="70" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+
+<!-- EN VENTA: en mayúsculas -->
+<text x="320" y="160" font-family="Montserrat" font-weight="400" font-size="40" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
+
+   <!-- MALLORCA: en mayúsculas -->
+<text x="620" y="107" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
+
+<!-- POLÍGONO SUR: en mayúsculas -->
+<text x="620" y="171" font-family="Montserrat" font-weight="400" font-size="25.7" fill="#000000">${esc(colonia.toUpperCase())}</text>
+
     <!-- Precio: x=614, y=746, font=26.3pt, centrado -->
     <text x="731" y="772" font-family="Montserrat" font-weight="700" font-size="26.3" fill="#000000" text-anchor="middle">${esc(precioStr)}</text>
     
