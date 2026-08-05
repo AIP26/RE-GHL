@@ -145,9 +145,9 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
     <rect width="250" height="139" fill="url(#blurFade)" filter="url(#blur)"/>
   </svg>`;
 
-  // Rectángulo precio: 250×105, top:757, left:606
-  const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="105" viewBox="0 0 250 105">
-    <rect width="250" height="105" fill="${CREAM}" rx="4"/>
+  // Rectángulo precio: 250×140, top:722, left:606 (crece hacia arriba)
+const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="140" viewBox="0 0 250 140">
+    <rect width="250" height="140" fill="${CREAM}" rx="4"/>
   </svg>`;
 
   // Barra inferior: 1000×67, top:789
@@ -181,13 +181,14 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
   const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
     ${fontFaceDefs(fonts)}
     
-<!-- DEPA: alineado con BALAY -->
-<text x="320" y="100" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+<!-- DEPA: bajado para alinear visualmente con BALAY -->
+<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
 <!-- EN VENTA: más cerca de DEPA -->
 <text x="320" y="145" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion.toUpperCase())}</text>
-   <!-- MALLORCA: en mayúsculas -->
-<text x="620" y="107" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
+
+   <!-- MALLORCA/BALAY: subido para alinear con DEPA -->
+<text x="620" y="120" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
 
 <!-- POLÍGONO SUR: en mayúsculas -->
 <text x="620" y="171" font-family="Montserrat" font-weight="400" font-size="25.7" fill="#000000">${esc(colonia.toUpperCase())}</text>
@@ -211,7 +212,7 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 <text x="710" y="835" font-family="Montserrat" font-weight="700" font-size="20" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
   <!-- Dirección centrada en negritas -->
-<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
+<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
 <!-- WhatsApp centrado -->
 ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
   </svg>`;
@@ -223,9 +224,9 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
     { input: photoResized, top: 210, left: 0 },
     { input: photoOverlay, top: 210, left: 0 },
     // Gradient blur
-    { input: Buffer.from(gradientSvg), top: 566, left: 661 },
+    { input: Buffer.from(gradientSvg), top: 722, left: 661 },
     // Rectángulo precio
-    { input: Buffer.from(rectPrecioSvg), top: 757, left: 606 },
+    { input: Buffer.from(rectPrecioSvg), top: 722, left: 606 },
     // Barra inferior
     { input: Buffer.from(barraSvg), top: 789, left: 0 },
     // Líneas
