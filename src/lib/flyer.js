@@ -41,19 +41,21 @@ async function loadFonts() {
 /** Bloque @font-face para embeber en el `<defs>` del SVG.  Sin esto,
  *  librsvg (backend de Sharp) no encuentra la fuente en el container. */
 function fontFaceDefs({ regularB64, boldB64 }) {
-  return `<style><![CDATA[
-    @font-face {
-      font-family: 'Montserrat';
-      font-weight: 400;
-      src: url(data:font/ttf;base64,${regularB64}) format('truetype');
-    }
-    @font-face {
-      font-family: 'Montserrat';
-      font-weight: 700;
-      src: url(data:font/ttf;base64,${boldB64}) format('truetype');
-    }
-    text { font-family: 'Montserrat', sans-serif; }
-  ]]></style>`;
+  return `<defs>
+    <style>
+      @font-face {
+        font-family: 'Montserrat';
+        font-weight: 400;
+        src: url(data:font/ttf;base64,${regularB64}) format('truetype');
+      }
+      @font-face {
+        font-family: 'Montserrat';
+        font-weight: 700;
+        src: url(data:font/ttf;base64,${boldB64}) format('truetype');
+      }
+      text { font-family: 'Montserrat', 'DejaVu Sans', 'Liberation Sans', 'Noto Sans', sans-serif; }
+    </style>
+  </defs>`;
 }
 
 // ---------------------------------------------------------------------
@@ -166,31 +168,33 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   // ---- Capa 3: gradiente crema fade en esquina inf-der de la foto -------
   //     De 200 px de ancho × 105 px alto, fade crema→transparente,
   //     ubicado justo antes del rect precio (top 693..798, left 606..806).
-  const gradientSvg = `<svg width="200" height="105" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="fade" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#f5f0ea" stop-opacity="0"/>
-        <stop offset="70%" stop-color="#f5f0ea" stop-opacity="1"/>
-        <stop offset="100%" stop-color="#f5f0ea" stop-opacity="1"/>
-      </linearGradient>
-    </defs>
-    <rect width="200" height="105" fill="url(#fade)"/>
-  </svg>`;
+  const gradientSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="105" viewBox="0 0 200 105">
+  <defs>
+    <linearGradient id="fade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${CREAM}" stop-opacity="0"/>
+      <stop offset="100%" stop-color="${CREAM}" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="105" fill="url(#fade)"/>
+</svg>`;
 
   // ---- Capas 4-6: shapes (rect precio + barra inferior + línea vertical)
   //     Todos en un solo SVG-shapes para 1 composite call.
-  const shapesSvg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-    <!-- 4. Rectángulo precio -->
-    <rect x="606" y="758" width="250" height="105" fill="${CREAM}"/>
-    <!-- 5. Barra inferior con color de marca -->
-    <rect x="0" y="789" width="${W}" height="67" fill="${accent}"/>
-    <!-- Separadores stats crema (3px, dentro de la barra) -->
-    <rect x="180" y="795" width="3" height="55" fill="${CREAM}"/>
-    <rect x="385" y="795" width="3" height="55" fill="${CREAM}"/>
-    <rect x="585" y="795" width="3" height="55" fill="${CREAM}"/>
-    <!-- 6. Línea divisoria vertical negra -->
-    <line x1="600" y1="194" x2="600" y2="74" stroke="#000000" stroke-width="3"/>
-  </svg>`;
+  const shapesSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <!-- Rectángulo crema detrás del precio -->
+  <rect x="606" y="758" width="250" height="105" fill="${CREAM}" rx="4"/>
+  
+  <!-- Barra inferior de stats -->
+  <rect x="0" y="879" width="1000" height="121" fill="${accent}"/>
+  
+  <!-- Línea vertical divisoria header -->
+  <line x1="500" y1="40" x2="500" y2="180" stroke="#000000" stroke-width="2"/>
+  
+  <!-- Líneas separadoras stats -->
+  <line x1="250" y1="879" x2="250" y2="1000" stroke="${CREAM}" stroke-width="3"/>
+  <line x1="500" y1="879" x2="500" y2="1000" stroke="${CREAM}" stroke-width="3"/>
+  <line x1="750" y1="879" x2="750" y2="1000" stroke="${CREAM}" stroke-width="3"/>
+</svg>`;
 
   // ---- Capa 8: SVG con TODOS los textos ---------------------------------
   const titulo = truncate(p.titulo || 'Propiedad', TITLE_MAX_CHARS);
@@ -209,39 +213,50 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   const tituloSize = fitFontSize(titulo, 36.8, 361);
 
   // Stats
-  const banos = safeNum(p.banos);
+  const banos = safeNum(p.banos_completos);
   const recamaras = safeNum(p.recamaras);
   const niveles = safeNum(p.niveles);
   const m2c = safeNum(p.m2_construccion);
 
   const wa = (version === 'client' && agent?.whatsapp) ? String(agent.whatsapp) : '';
 
-  const textSvg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-    <defs>${fontFaceDefs(fonts)}</defs>
-
-    <!-- Header izquierdo -->
-    <text x="299" y="${36 + 53}" font-size="53.4pt" font-weight="400" fill="${accent}" text-anchor="start">${esc(tipoInmueble)}</text>
-    <text x="206" y="${112 + 45}" font-size="45.6pt" font-weight="400" fill="#000000" text-anchor="start">${esc(tipoOperacion)}</text>
-
-    <!-- Header derecho (título + colonia) -->
-    <text x="619" y="${70 + tituloSize}" font-size="${tituloSize}pt" font-weight="700" fill="${accent}" text-anchor="start">${esc(titulo)}</text>
-    <text x="619" y="${144 + coloniaSize}" font-size="${coloniaSize}pt" font-weight="400" fill="#000000" text-anchor="start">${esc(colonia)}</text>
-
-    <!-- Precio centrado en el rect (606..856 → x=731) -->
-    <text x="731" y="${747 + 26}" font-size="26.3pt" font-weight="700" fill="#000000" text-anchor="middle">${esc(precioStr)}</text>
-    ${notaPrecio ? `<text x="731" y="${796 + 17}" font-size="17pt" font-weight="400" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
-
-    <!-- Barra stats (color crema sobre acento) -->
-    <text x="20" y="${811 + 16}" font-size="15.6pt" font-weight="400" fill="${CREAM}" text-anchor="start">${banos} baños</text>
-    <text x="200" y="${811 + 16}" font-size="15.6pt" font-weight="400" fill="${CREAM}" text-anchor="start">${recamaras} recámaras</text>
-    <text x="405" y="${811 + 14}" font-size="13.7pt" font-weight="400" fill="${CREAM}" text-anchor="start">${niveles} niveles</text>
-    <text x="605" y="${811 + 14}" font-size="13.7pt" font-weight="400" fill="${CREAM}" text-anchor="start">${m2c} m² const.</text>
-
-    <!-- Footer: dirección completa (pin dibujado como path) -->
-    <path d="M 100 895 C 100 889 105 884 111 884 C 117 884 122 889 122 895 C 122 903 111 918 111 918 C 111 918 100 903 100 895 Z M 111 891 C 109 891 108 892 108 894 C 108 896 109 897 111 897 C 113 897 114 896 114 894 C 114 892 113 891 111 891 Z" fill="#000000"/>
-    <text x="130" y="${898 + 18}" font-size="18.2pt" font-weight="400" fill="#000000" text-anchor="start">${esc(direccionFooter)}</text>
-    ${wa ? `<text x="130" y="${928 + 18}" font-size="18.2pt" font-weight="400" fill="${accent}" text-anchor="start">${esc('WhatsApp: ' + wa)}</text>` : ''}
-  </svg>`;
+  const textSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  ${fontFaceDefs(fonts)}
+  
+  <!-- Header izquierdo: tipo_inmueble -->
+  <text x="40" y="80" font-family="Montserrat" font-weight="700" font-size="28" fill="${accent}">${esc(tipoInmueble)}</text>
+  
+  <!-- Header izquierdo: tipo_operacion -->
+  <text x="40" y="115" font-family="Montserrat" font-weight="400" font-size="20" fill="#000000">${esc(tipoOperacion)}</text>
+  
+  <!-- Header derecho: título -->
+  <text x="519" y="80" font-family="Montserrat" font-weight="700" font-size="${tituloSize}" fill="${accent}">${esc(titulo)}</text>
+  
+  <!-- Header derecho: colonia -->
+  <text x="519" y="115" font-family="Montserrat" font-weight="400" font-size="${coloniaSize}" fill="#000000">${esc(colonia)}</text>
+  
+  <!-- Precio -->
+  <text x="626" y="805" font-family="Montserrat" font-weight="700" font-size="28" fill="#000000">${esc(precioStr)}</text>
+  
+  <!-- Nota de precio -->
+  ${notaPrecio ? `<text x="626" y="835" font-family="Montserrat" font-weight="400" font-size="16" fill="${accent}">${esc(notaPrecio)}</text>` : ''}
+  
+  <!-- Stats -->
+  <text x="125" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${banos} BAÑOS</text>
+  <text x="375" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${recamaras} RECÁMARAS</text>
+  <text x="625" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${niveles} NIVELES</text>
+  <text x="875" y="940" font-family="Montserrat" font-weight="400" font-size="16" fill="${CREAM}" text-anchor="middle">${m2c} M² CONST.</text>
+  
+  <!-- Dirección footer -->
+  <text x="60" y="970" font-family="Montserrat" font-weight="400" font-size="14" fill="#000000">${esc(direccionFooter)}</text>
+  
+  <!-- WhatsApp (solo version=client) -->
+  ${wa ? `<text x="60" y="990" font-family="Montserrat" font-weight="400" font-size="12" fill="#666666">${esc('WhatsApp: ' + wa)}</text>` : ''}
+  
+  <!-- Pin de ubicación -->
+  <path d="M40 955 C40 950, 44 946, 48 946 C52 946, 56 950, 56 955 C56 962, 48 970, 48 970 C48 970, 40 962, 40 955 Z" fill="${accent}"/>
+  <circle cx="48" cy="955" r="3" fill="#ffffff"/>
+</svg>`;
 
   // ---- Ensamblado -----------------------------------------------------
   const composites = [
