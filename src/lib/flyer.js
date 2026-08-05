@@ -142,9 +142,16 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
     <rect width="250" height="200" fill="url(#blurFade)" filter="url(#blur)"/>
   </svg>`;
 
-  // Rectángulo precio: 250×140, top:722, left:606 (crece hacia arriba)
+   // Rectángulo precio con degradado hacia arriba
   const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="140" viewBox="0 0 250 140">
-    <rect width="250" height="140" fill="${CREAM}" rx="4"/>
+    <defs>
+      <linearGradient id="precioFade" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="${CREAM}" stop-opacity="0.3"/>
+        <stop offset="40%" stop-color="${CREAM}" stop-opacity="0.85"/>
+        <stop offset="100%" stop-color="${CREAM}" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <rect width="250" height="140" fill="url(#precioFade)" rx="4"/>
   </svg>`;
 
   // Barra inferior: 1000×67, top:789
