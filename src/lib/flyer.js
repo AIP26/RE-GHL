@@ -172,7 +172,7 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
   // Textos
   const nombreCondominio = truncate(p.nombre_condominio || p.titulo || 'Propiedad', TITLE_MAX_CHARS);
   const tipoInmuebleRaw = (p.tipo_inmueble || '').toUpperCase();
-  const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleRaw;
+  const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPTO' : tipoInmuebleRaw;
   const tipoOperacionRaw = (p.tipo_operacion || '').toUpperCase();
   const tipoOperacion = tipoOperacionRaw === 'VENTA' || tipoOperacionRaw === 'RENTA' ? 'EN ' + tipoOperacionRaw : tipoOperacionRaw;
   const colonia = p.colonia || '';
@@ -186,10 +186,10 @@ const rectPrecioSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" heigh
     ${fontFaceDefs(fonts)}
     
 <!-- DEPA: bajado para alinear visualmente con BALAY -->
-<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="55" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
+<text x="320" y="125" font-family="Montserrat" font-weight="700" font-size="75" fill="${accent}">${esc(tipoInmueble.toUpperCase())}</text>
 
 <!-- EN VENTA: más cerca de DEPA -->
-<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="30" fill="#000000">${esc(tipoOperacion)}</text>
+<text x="320" y="165" font-family="Montserrat" font-weight="400" font-size="45" fill="#000000">${esc(tipoOperacion)}</text>
 
    <!-- MALLORCA/BALAY: subido para alinear con DEPA -->
 <text x="620" y="120" font-family="Montserrat" font-weight="700" font-size="36.7" fill="${accent}">${esc(nombreCondominio.toUpperCase())}</text>
@@ -244,10 +244,10 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
   // Lo posicionamos en (0, 0) y recortamos visualmente si es necesario
  if (logoBuf) {
     const logoProcessed = await sharp(logoBuf)
-      .resize(180, 160, { fit: 'inside', withoutEnlargement: false })
+      .resize(220, 200, { fit: 'inside', withoutEnlargement: false })
       .png()
       .toBuffer();
-    composites.push({ input: logoProcessed, top: 30, left: 15 });
+    composites.push({ input: logoProcessed, top: 40, left: 20 });
   }
 
   // Textos (encima de todo)
