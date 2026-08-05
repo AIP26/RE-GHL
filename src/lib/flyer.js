@@ -210,7 +210,7 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 <text x="710" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
 
   <!-- Dirección centrada en negritas -->
-<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
+<text x="500" y="920" font-family="Montserrat" font-weight="700" font-size="25" fill="#000000" text-anchor="middle"> ${esc(direccionFooter)}</text>
 <!-- WhatsApp centrado -->
 ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
   </svg>`;
@@ -238,7 +238,7 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
       .resize(180, 160, { fit: 'inside', withoutEnlargement: false })
       .png()
       .toBuffer();
-    composites.push({ input: logoProcessed, top: 25, left: 15 });
+    composites.push({ input: logoProcessed, top: 30, left: 15 });
   }
 
   // Textos (encima de todo)
