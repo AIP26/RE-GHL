@@ -231,7 +231,7 @@ ${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-si
     { input: photoResized, top: 210, left: 0 },
     { input: photoOverlay, top: 210, left: 0 },
     // Gradient blur
-    { input: Buffer.from(gradientSvg), top: 515, left: 606 },
+    { input: Buffer.from(gradientSvg), top: 540, left: 606 },
     // Rectángulo precio
     { input: Buffer.from(rectPrecioSvg), top: 722, left: 606 },
     // Barra inferior
