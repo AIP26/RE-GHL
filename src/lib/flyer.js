@@ -197,24 +197,24 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
     <!-- Nota precio: x=631, y=795, font=17pt, centrado -->
     ${notaPrecio ? `<text x="731" y="812" font-family="Montserrat" font-weight="400" font-size="17" fill="${accent}" text-anchor="middle">${esc(notaPrecio)}</text>` : ''}
     
-    <!-- 2.5 BAÑOS: x=-12, y=812, font=15.6pt, centrado → ajustado a x=88 -->
-    <text x="88" y="827" font-family="Montserrat" font-weight="400" font-size="15.6" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
-    
-    <!-- 3 RECAMARAS: x=193, y=812, font=15.6pt, centrado → x=298 -->
-    <text x="298" y="827" font-family="Montserrat" font-weight="400" font-size="15.6" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
-    
-    <!-- 2 NIVELES: x=407, y=812, font=13.7pt, centrado → x=504 -->
-    <text x="504" y="827" font-family="Montserrat" font-weight="400" font-size="13.7" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
-    
-    <!-- m²: cuarta columna -->
-    <text x="710" y="827" font-family="Montserrat" font-weight="400" font-size="13.7" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
-    
-    <!-- Dirección: x=113, y=899, font=18.3pt -->
-    <text x="113" y="917" font-family="Montserrat" font-weight="400" font-size="18.3" fill="#000000">📍 ${esc(direccionFooter)}</text>
-    
-    <!-- WhatsApp -->
-    ${wa ? `<text x="113" y="945" font-family="Montserrat" font-weight="400" font-size="14" fill="#666666">WhatsApp: ${esc(wa)}</text>` : ''}
-  </svg>`;
+    <!-- 2.5 BAÑOS -->
+<text x="88" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.banos_completos)} BAÑOS</text>
+
+<!-- 3 RECAMARAS -->
+<text x="298" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.recamaras)} RECÁMARAS</text>
+
+<!-- 2 NIVELES -->
+<text x="504" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.niveles)} NIVELES</text>
+
+<!-- m² -->
+<text x="710" y="830" font-family="Montserrat" font-weight="700" font-size="22" fill="${CREAM}" text-anchor="middle">${safeNum(p.m2_construccion)} M²</text>
+
+   <!-- Dirección centrada -->
+<text x="500" y="920" font-family="Montserrat" font-weight="400" font-size="20" fill="#000000" text-anchor="middle">📍 ${esc(direccionFooter)}</text>
+
+<!-- WhatsApp centrado -->
+${wa ? `<text x="500" y="950" font-family="Montserrat" font-weight="400" font-size="16" fill="#666666" text-anchor="middle">WhatsApp: ${esc(wa)}</text>` : ''}
+
 
   // Composites (todo debe caber en 1000×1000)
   const composites = [
@@ -233,12 +233,12 @@ const tipoInmueble = tipoInmuebleRaw === 'DEPARTAMENTO' ? 'DEPA' : tipoInmuebleR
 
   // Logo: Canva lo pone en (-54, -14) pero Sharp no permite negativos
   // Lo posicionamos en (0, 0) y recortamos visualmente si es necesario
-  if (logoBuf) {
+ if (logoBuf) {
     const logoProcessed = await sharp(logoBuf)
-      .resize(277, 249, { fit: 'inside', withoutEnlargement: false })
+      .resize(180, 160, { fit: 'inside', withoutEnlargement: false })
       .png()
       .toBuffer();
-    composites.push({ input: logoProcessed, top: 0, left: 0 });
+    composites.push({ input: logoProcessed, top: 15, left: 15 });
   }
 
   // Textos (encima de todo)
