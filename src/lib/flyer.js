@@ -210,8 +210,7 @@ export async function generateFlyer({ property, brand, agent, version, photoUrl 
   const coloniaSize = fitFontSize(colonia, 25.6, 381);
   // Auto-shrink del título para que quepa entre x=619 y el borde derecho
   // (margen visual ~20px → maxWidth = 1000 - 619 - 20 = 361).
-  const tituloSize = fitFontSize(titulo, 36.8, 361);
-
+ const tituloSize = fitFontSize(nombreCondominio, 36.8, 361);
   // Stats
   const banos = safeNum(p.banos_completos);
   const recamaras = safeNum(p.recamaras);
