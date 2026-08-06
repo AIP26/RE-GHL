@@ -721,7 +721,7 @@ function renderGhlFormEmbed(value, ctaText) {
   // BLOQUE P4 FIX 1 — Sin scrollbars: contenedor con overflow:hidden,
   // iframe con min-height 650px (780px calendarios) que se expande según
   // el widget. Data-kind se usa por CSS para elegir el min-height correcto.
-    const iframeHeight = asset.kind === 'calendar' ? '1000px' : '850px';
+    const iframeHeight = asset.kind === 'calendar' ? '980px' : '850px';
   return `<div class="ghl-form-embed" data-kind="${esc(asset.kind)}">
     ${headerHtml}
     <div class="ghl-form-embed-inner">
