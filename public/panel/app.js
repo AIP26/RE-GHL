@@ -2013,9 +2013,10 @@
         </div>
       </div>
 
-      <div className="brand-section">
+            <div className="brand-section">
         <h2 className="card-title">Analytics</h2>
         <${TextField} label="Google Analytics GA4 tag (opcional)" value=${m.ga4_tag} onChange=${(v) => set('ga4_tag', v)} placeholder="G-XXXXXXXXXX" testid="brand-ga4" full />
+        <${TextField} label="Pixel de Facebook (Meta Pixel ID)" value=${m.pixel_facebook} onChange=${(v) => set('pixel_facebook', v)} placeholder="Ej: 123456789012345" testid="brand-pixel-fb" full />
       </div>
 
       <div className="action-bar" style=${{ position: 'sticky', bottom: 0, background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', padding: '14px 0', margin: '0 -24px -24px', justifyContent: 'space-between' }}>
