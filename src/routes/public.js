@@ -238,15 +238,16 @@ r.get('/p/:slug', async (req, res, next) => {
     const showMap = p.latitud && p.longitud && !p.ocultar_direccion_exacta;
 
     const html =
-      head({
-        title,
-        ogTitle,
-        description,
-        brand,
-        ogImage: photoUrls[0] || brand?.hero_foto_url,
-        ogUrl: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
-        canonical: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
-      }) +
+  head({
+    title,
+    ogTitle,
+    description,
+    brand,
+    ogImage: photoUrls[0] || brand?.hero_foto_url,
+    ogUrl: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
+    canonical: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
+    pixelFacebook: p.pixel_facebook || null,
+  }) +
       brandHeader(brand) +
       `<section class="section">
         <div class="container">
