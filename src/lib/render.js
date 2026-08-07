@@ -129,7 +129,6 @@ export function head({
   ogUrl,
   canonical,
   noindex = false,
-  pixelFacebook = null,
 }) {
   const primary = safeColor(brand?.color_principal, '#0f172a');
   const secondary = safeColor(brand?.color_secundario, '#1e293b');
