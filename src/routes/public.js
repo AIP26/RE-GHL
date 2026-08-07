@@ -246,7 +246,6 @@ r.get('/p/:slug', async (req, res, next) => {
     ogImage: photoUrls[0] || brand?.hero_foto_url,
     ogUrl: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
     canonical: portalUrl(brand, '/p/' + (p.slug_url || record.id)),
-    pixelFacebook: p.pixel_facebook || null,
   }) +
       brandHeader(brand) +
       `<section class="section">
