@@ -133,7 +133,7 @@ export function head({
   const primary = safeColor(brand?.color_principal, '#0f172a');
   const secondary = safeColor(brand?.color_secundario, '#1e293b');
   const accent = safeColor(brand?.color_acento, '#f59e0b');
-  con  const ga4 = brand?.ga4_tag;
+  const ga4 = brand?.ga4_tag;
   const pixelFacebook = brand?.pixel_facebook;
   const _ogTitle = ogTitle || title;
 
