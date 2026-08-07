@@ -16,6 +16,7 @@ const ALLOWED = [
   'asociaciones', // jsonb [{nombre, logo_url}]
   'widget_tipo', 'widget_valor',
   'ga4_tag',
+  'pixel_facebook',
 ];
 
 const HEX_RE = /^#([0-9a-fA-F]{3}){1,2}$/;
