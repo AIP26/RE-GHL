@@ -159,7 +159,7 @@
   // -------------------------------------------------------------------
   // Form schema — replica el Master Context v2.6 y matchea ghl-field-ids.json
   // -------------------------------------------------------------------
-  cconst AMENIDADES = ['Aire acondicionado','Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción','Cuarto de servicio','Cuarto de lavado','Terraza'];
+  const AMENIDADES = ['Aire acondicionado','Alberca','Gym','Roof garden','Vigilancia 24h','Elevador','Área BBQ','Jardín','Salón de eventos','Beach Club','Acceso a playa','Cancha','Spa','Golf','Kids area','Restaurante-Bar','Intercomunicador','Portón eléctrico','Pádel','Tenis','Acceso para discapacitados','Internet','Recepción','Cuarto de servicio','Cuarto de lavado','Terraza'];
   const NORMAS = ['Pet friendly','Permite rentas vacacionales','Solo familias','No niños'];
   const MONEDAS = ['USD','MXN','CAD'];
 
