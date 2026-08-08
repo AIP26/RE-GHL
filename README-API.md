@@ -8,7 +8,7 @@ inventario inmobiliario de un tenant.
 > **Formato:** JSON
 > **Auth:** API key per-tenant (header)
 
----
+--- 
 
 ## 1. Generar tu API key
 
