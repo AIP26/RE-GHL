@@ -273,7 +273,7 @@ r.get('/p/:slug', async (req, res, next) => {
                 ${p.nota_precio ? `<div style="font-size:13px;color:var(--color-text-muted);margin-top:8px;font-style:italic">${esc(p.nota_precio)}</div>` : ''}
               </div>
 
-                <div class="stats-row">
+                 <div class="stats-row">
                 ${p.recamaras ? statCell('Recámaras', p.recamaras, ICON_BED) : ''}
                 ${p.banos_completos ? statCell('Baños', p.banos_completos, ICON_BATH) : ''}
                 ${p.m2_construccion ? statCell('m² construcción', p.m2_construccion, ICON_AREA) : ''}
