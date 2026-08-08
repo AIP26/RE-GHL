@@ -273,13 +273,13 @@ r.get('/p/:slug', async (req, res, next) => {
                 ${p.nota_precio ? `<div style="font-size:13px;color:var(--color-text-muted);margin-top:8px;font-style:italic">${esc(p.nota_precio)}</div>` : ''}
               </div>
 
-                 <div class="stats-row">
-                ${p.recamaras ? statCell('Recámaras', p.recamaras, ICON_BED) : ''}
-                ${p.banos_completos ? statCell('Baños', p.banos_completos, ICON_BATH) : ''}
-                ${p.m2_construccion ? statCell('m² construcción', p.m2_construccion, ICON_AREA) : ''}
-                ${p.m2_terreno && ['Casa', 'Terreno'].includes(p.tipo_inmueble) ? statCell('m² terreno', p.m2_terreno, ICON_AREA) : ''}
-                ${p.estacionamientos ? statCell('Estacionamientos', p.estacionamientos, ICON_CAR) : ''}
-              </div>
+                         <div class="stats-row" style="margin:18px 0">
+          ${p.recamaras ? statCell('Recámaras', p.recamaras, ICON_BED) : ''}
+          ${p.banos_completos ? statCell('Baños', p.banos_completos, ICON_BATH) : ''}
+          ${p.m2_construccion ? statCell('m² construcción', p.m2_construccion, ICON_AREA) : ''}
+          ${p.m2_terreno && ['Casa', 'Terreno'].includes(p.tipo_inmueble) ? statCell('m² terreno', p.m2_terreno, ICON_AREA) : ''}
+          ${p.estacionamientos ? statCell('Estacionamientos', p.estacionamientos, ICON_CAR) : ''}
+        </div>
 
               ${p.descripcion ? `<div style="padding:18px 0;border-bottom:1px solid var(--color-border)">
                 <h3 style="font-size:18px;font-weight:700;margin:0 0 10px">Descripción</h3>
