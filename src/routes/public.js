@@ -1,7 +1,7 @@
 // Páginas públicas (Paso 9) — servidas en dominios custom de clientes
 // (propiedades.thebrokers.mx) o en preview vía ?preview=<tenantId>.
 //
-// 5 rutas: 
+// 5 rutas:  
 //   GET /                 → Home con hero + buscador
 //   GET /coleccion/:slug  → Grid de colección con filtros client-side
 //   GET /p/:slug          → Detalle de propiedad + SEO + page_view
